@@ -20,6 +20,7 @@ import {
 	normalizeMapKey,
 } from "../path-utils.js";
 import { collectProjectSourceFilesWithBudgetAsync } from "../project-scan-policy.js";
+import { loadPiLensProjectConfig } from "../project-lens-config.js";
 import { getReviewGraphMaxFilesDerived } from "../project-scale.js";
 import {
 	jsTsCandidatePaths,
@@ -493,20 +494,26 @@ function diffSignatureMaps(
 	return { added, removed, changed };
 }
 
-// #776: `PI_LENS_REVIEW_GRAPH_MAX_FILES` (the existing per-subsystem env
-// override) still wins outright; below it, the derived `maxProjectFiles`
-// scale-knob value (see `project-scale.ts`) replaces the old hardcoded
-// `RUNTIME_CONFIG.reviewGraph.maxFiles` constant as the fallback — the ratio
-// table reproduces that same 1,000-file default at the default base, so this
-// is behavior-neutral when nothing is configured.
+// #775: precedence chain for the review-graph file budget — env override
+// (PI_LENS_REVIEW_GRAPH_MAX_FILES) wins first, then the project-config
+// reviewGraph.maxFiles knob (clamped to [100, 20000]), then the adaptive
+// derived budget (see project-scale.ts).
 function getReviewGraphMaxFiles(cwd?: string): number {
 	const override = Number.parseInt(
 		process.env.PI_LENS_REVIEW_GRAPH_MAX_FILES ?? "",
 		10,
 	);
-	return Number.isFinite(override) && override > 0
-		? override
-		: getReviewGraphMaxFilesDerived(cwd);
+	if (Number.isFinite(override) && override > 0) return override;
+
+	// #775: project-config override, clamped on load
+	if (cwd) {
+		const config = loadPiLensProjectConfig(cwd);
+		if (config.reviewGraph?.maxFiles !== undefined) {
+			return config.reviewGraph.maxFiles;
+		}
+	}
+
+	return getReviewGraphMaxFilesDerived(cwd);
 }
 
 function getReviewGraphMaxFileBytes(): number {
@@ -646,6 +653,19 @@ async function getGraphSourceFiles(cwd: string): Promise<string[]> {
 		});
 	}
 	if (collected.length > maxGraphFiles) {
+		// #775: log the truncation so it's observable — a silent cap violated
+		// the AGENTS.md "no silent caps" rule before this phase was added.
+		logLatency({
+			type: "phase",
+			phase: "review_graph_source_walk_truncated",
+			filePath: cwd,
+			durationMs: 0,
+			metadata: {
+				cwd,
+				collectedFiles: collected.length,
+				maxGraphFiles,
+			},
+		});
 		// Contents are unused by the too_many_files branch; return the capped list
 		// so the caller's `length > maxGraphFiles` check still trips.
 		return collected;

@@ -102,11 +102,17 @@ export function getProjectScaleBase(cwd?: string): number {
  * {@link DEFAULT_PROJECT_SCALE_BASE}. The unit each budget is expressed in
  * stays subsystem-appropriate (files vs. directory entries); this table is
  * the single place that encodes the relationship between them.
+ *
+ * NOTE: the review-graph ratio (0.5×) is the starting point for the adaptive
+ * taper scheme — {@link getReviewGraphMaxFilesDerived} applies the actual
+ * budget using the constants below, NOT this raw ratio directly. The ratio
+ * is preserved here so {@link deriveBudget} still works consistently if any
+ * caller passes `PROJECT_SCALE_RATIOS.reviewGraph` to it.
  */
 export const PROJECT_SCALE_RATIOS = {
 	/** project-diagnostics scanner: files kept. 0.25 * 2,000 = 500. */
 	projectDiagnosticsScanner: 0.25,
-	/** review graph: files kept. 0.5 * 2,000 = 1,000. */
+	/** review graph: files kept. 0.5 * 2,000 = 1,000 (base of taper). */
 	reviewGraph: 0.5,
 	/** startup scan: source files counted. 1 * 2,000 = 2,000. */
 	startupScan: 1,
@@ -115,6 +121,58 @@ export const PROJECT_SCALE_RATIOS = {
 	/** word index: files indexed. 3 * 2,000 = 6,000. */
 	wordIndex: 3,
 } as const;
+
+/**
+ * Adaptive review-graph budget constants (#775).
+ *
+ * The review-graph builder's per-file cost profile (tree-sitter parse +
+ * symbol extraction + edge resolution) scales linearly with file count.
+ * At small-to-medium project scales (maxProjectFiles ≤ 3,000, yielding up
+ * to 1,500 graph-relevant files) the original 0.5× ratio applies directly.
+ *
+ * Beyond that the ratio tapers linearly toward a hard ceiling of 5,000
+ * files, grounded by the builder's actual per-file cost characteristics:
+ *
+ *   - Each file requires one tree-sitter parse (~2–10ms depending on
+ *     language and file size), one symbol extraction pass through
+ *     tree-sitter queries, and one edge-resolution pass over imports,
+ *     references, and call sites.
+ *   - At 5K files the serialized graph elements (file nodes + symbol
+ *     nodes + cross-file edges) stay well under ~150K for even
+ *     symbol-dense repos, leaving generous headroom below the 200K
+ *     {@link GRAPH_PERSIST_MAX_ELEMENTS_DEFAULT} persist cap.
+ *   - Beyond 5K files the element count would risk hitting the persist
+ *     cap and the multi-second JSON.stringify OOM hazards documented
+ *     in builder.ts (the persist circuit-breaker at line ~1260).
+ *
+ * The linear taper prevents a hard cutoff — a repo that modestly exceeds
+ * the threshold still gets a useful fraction of its graph built, rather
+ * than dropping from a usable budget to a skip verdict at a cliff edge.
+ *
+ * Taper formula (applied when base > TAPER_THRESHOLD):
+ *
+ *   budget = TAPER_BASE_BUDGET + (base - TAPER_THRESHOLD) * TAPER_SLOPE
+ *   clamped to [1, HARD_CEILING]
+ *
+ * Defaults at key points:
+ *   base      | 0.5× flat | tapered | ceiling-clamped
+ *   ----------|-----------|---------|----------------
+ *   2,000     | 1,000     | 1,000   | 1,000
+ *   3,000     | 1,500     | 1,500   | 1,500
+ *   5,000     | 2,500     | 1,900   | 1,900
+ *   10,000    | 5,000     | 2,900   | 2,900
+ *   20,000    | 10,000    | 4,900   | 4,900
+ *   22,000    | 11,000    | 5,300   | 5,000
+ *
+ * The 0.5× flat budget is shown for reference — the tapered budget is
+ * what the review graph actually uses at each scale.
+ */
+export const REVIEW_GRAPH_TAPER_THRESHOLD = 3_000 satisfies number;
+export const REVIEW_GRAPH_TAPER_BASE_BUDGET = 1_500 satisfies number;
+export const REVIEW_GRAPH_TAPER_SLOPE = 0.2 satisfies number;
+export const REVIEW_GRAPH_HARD_CEILING = 5_000 satisfies number;
+
+
 
 /**
  * Scale a ratio from {@link PROJECT_SCALE_RATIOS} by the resolved base,
@@ -131,9 +189,24 @@ export function getProjectDiagnosticsScannerMaxFiles(cwd?: string): number {
 	return deriveBudget(PROJECT_SCALE_RATIOS.projectDiagnosticsScanner, cwd);
 }
 
-/** Derived review-graph budget (files). See {@link deriveBudget}. */
+/**
+ * Adaptive review-graph budget (files), replacing the flat 0.5× ratio (#775).
+ *
+ * At or below {@link REVIEW_GRAPH_TAPER_THRESHOLD} the original 0.5× ratio
+ * applies unchanged. Above it the ratio tapers linearly toward
+ * {@link REVIEW_GRAPH_HARD_CEILING} — see the REVIEW_GRAPH_TAPER_* constants
+ * for the formula and rationale.
+ */
 export function getReviewGraphMaxFilesDerived(cwd?: string): number {
-	return deriveBudget(PROJECT_SCALE_RATIOS.reviewGraph, cwd);
+	const base = getProjectScaleBase(cwd);
+	const flatBudget = Math.max(1, Math.round(base * PROJECT_SCALE_RATIOS.reviewGraph));
+	if (base <= REVIEW_GRAPH_TAPER_THRESHOLD) {
+		return flatBudget;
+	}
+	const taperBudget =
+		REVIEW_GRAPH_TAPER_BASE_BUDGET +
+		Math.round((base - REVIEW_GRAPH_TAPER_THRESHOLD) * REVIEW_GRAPH_TAPER_SLOPE);
+	return Math.min(taperBudget, REVIEW_GRAPH_HARD_CEILING);
 }
 
 /** Derived startup-scan budget (source files). See {@link deriveBudget}. */

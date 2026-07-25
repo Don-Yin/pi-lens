@@ -120,7 +120,19 @@ Per-rule threshold overrides. Currently honored:
 
 ### `maxProjectFiles`
 
-Single scale knob (default `2000`) that a large-but-healthy repo can raise to scale five independent size budgets together instead of tripping each one separately: the project-diagnostics scanner (0.25×, default 500 files), the review graph (0.5×, default 1,000 files), the startup scan (1×, default 2,000 source files), jscpd (3×, default 6,000 directory entries), and the word index (3×, default 6,000 files). Raising it (e.g. to `5000`) scales all five proportionally. Each subsystem's own environment-variable override (e.g. `PI_LENS_REVIEW_GRAPH_MAX_FILES`, `PI_LENS_STARTUP_SCAN_MAX_ENTRIES`) still takes precedence over this knob when set, and a separate `PI_LENS_MAX_PROJECT_FILES` environment variable sits below `maxProjectFiles` but above the built-in default. See `clients/project-scale.ts` for the full ratio table and precedence order.
+Single scale knob (default `2000`) that a large-but-healthy repo can raise to scale five independent size budgets together instead of tripping each one separately: the project-diagnostics scanner (0.25×, default 500 files), the review graph (0.5–0.2× adaptive, default 1,000–5,000 files — see [`reviewGraph.maxFiles`](#reviewGraphmaxfiles) below), the startup scan (1×, default 2,000 source files), jscpd (3×, default 6,000 directory entries), and the word index (3×, default 6,000 files). Raising it (e.g. to `5000`) scales all five proportionally. Each subsystem's own environment-variable override (e.g. `PI_LENS_REVIEW_GRAPH_MAX_FILES`, `PI_LENS_STARTUP_SCAN_MAX_ENTRIES`) still takes precedence over this knob when set, and a separate `PI_LENS_MAX_PROJECT_FILES` environment variable sits below `maxProjectFiles` but above the built-in default. See `clients/project-scale.ts` for the full ratio table and precedence order.
+
+### `reviewGraph.maxFiles`
+
+Hard override for the review graph's file budget (#775), bypassing the adaptive taper scheme.
+
+A monorepo with many source files whose review graph is being silently truncated (the graph builder logs a `review_graph_source_walk_truncated` latency phase when this happens) can set this to a larger value to opt into a bigger graph. Valid range is `100`–`20,000`; values outside this range are clamped with a warning.
+
+Precedence for the review-graph file budget (highest first):
+
+1. `PI_LENS_REVIEW_GRAPH_MAX_FILES` environment variable — always wins.
+2. `reviewGraph.maxFiles` project-config knob — clamped to [100, 20,000] on load.
+3. Adaptive derived budget based on `maxProjectFiles` — 0.5× up to 3,000 base, then tapers to a 5,000-file ceiling. See `clients/project-scale.ts`'s `REVIEW_GRAPH_TAPER_*` constants for the formula and rationale.
 
 ### Schema rules
 

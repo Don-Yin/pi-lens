@@ -257,4 +257,102 @@ describe("loadPiLensProjectConfig", () => {
 		const cfg = loadPiLensProjectConfig(tmpDir);
 		expect(cfg.configPath).toBeUndefined();
 	});
+
+	describe("reviewGraph.maxFiles (#775)", () => {
+		it("parses reviewGraph.maxFiles from .pi-lens.json", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: 3000 } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBe(3000);
+		});
+
+		it("clamps reviewGraph.maxFiles to [100, 20000] and warns", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: 25 } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBe(100);
+			expect(console.error).toHaveBeenCalledWith(
+				expect.stringContaining("clamped to [100, 20000]"),
+			);
+		});
+
+		it("clamps reviewGraph.maxFiles above 20000 and warns", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: 99999 } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBe(20000);
+			expect(console.error).toHaveBeenCalledWith(
+				expect.stringContaining("clamped to [100, 20000]"),
+			);
+		});
+
+		it("rejects non-finite reviewGraph.maxFiles with warn-once", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: "not-a-number" } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBeUndefined();
+			expect(console.error).toHaveBeenCalledWith(
+				expect.stringContaining(
+					"reviewGraph.maxFiles must be a positive finite number",
+				),
+			);
+		});
+
+		it("rejects negative reviewGraph.maxFiles", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: -5 } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBeUndefined();
+		});
+
+		it("warns once when reviewGraph is not an object", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: "string" }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph).toBeUndefined();
+			expect(console.error).toHaveBeenCalledWith(
+				expect.stringContaining("reviewGraph must be an object"),
+			);
+		});
+
+		it("rounds float reviewGraph.maxFiles to nearest integer", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: { maxFiles: 2500.7 } }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph?.maxFiles).toBe(2501);
+		});
+
+		it("absent reviewGraph.maxFiles leaves reviewGraph undefined", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ ignore: ["vendor/**"] }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph).toBeUndefined();
+		});
+
+		it("reviewGraph object with no maxFiles key produces empty config", () => {
+			fs.writeFileSync(
+				path.join(tmpDir, ".pi-lens.json"),
+				JSON.stringify({ reviewGraph: {} }),
+			);
+			const cfg = loadPiLensProjectConfig(tmpDir);
+			expect(cfg.reviewGraph).toEqual({});
+			expect(cfg.reviewGraph?.maxFiles).toBeUndefined();
+		});
+	});
 });

@@ -62,6 +62,19 @@ export interface PiLensProjectMutationConfig {
 	enabled?: boolean;
 }
 
+/**
+ * Review-graph specific project-config overrides (#775).
+ * All fields are optional; missing keys fall through to the
+ * env override / adaptive derived budget chain.
+ */
+export interface PiLensProjectReviewGraphConfig {
+	/**
+	 * Hard override for the review-graph's file budget, bypassing the
+	 * adaptive taper scheme. Clamped to [100, 20000] on load.
+	 */
+	maxFiles?: number;
+}
+
 export interface PiLensProjectConfig {
 	/** gitignore-style glob patterns added to every diagnostic scan. */
 	ignore: string[];
@@ -81,6 +94,11 @@ export interface PiLensProjectConfig {
 	 * `undefined` means "use the env override / default chain".
 	 */
 	maxProjectFiles: number | undefined;
+	/**
+	 * Review-graph specific overrides (#775).
+	 * `undefined` means "no override — use the env / derived chain".
+	 */
+	reviewGraph: PiLensProjectReviewGraphConfig | undefined;
 	/** The parsed JSON as-is, for forward-compat consumers. */
 	raw: unknown;
 	/** Absolute path of the config file that was loaded, or undefined if none. */
@@ -91,6 +109,7 @@ export const EMPTY_PROJECT_CONFIG: PiLensProjectConfig = {
 	ignore: [],
 	rules: {},
 	maxProjectFiles: undefined,
+	reviewGraph: undefined,
 	raw: undefined,
 	configPath: undefined,
 };
@@ -406,6 +425,45 @@ function parseConfigFile(configPath: string): PiLensProjectConfig {
 		}
 	}
 
+	let reviewGraph: PiLensProjectReviewGraphConfig | undefined;
+	if (
+		obj.reviewGraph &&
+		typeof obj.reviewGraph === "object" &&
+		!Array.isArray(obj.reviewGraph)
+	) {
+		const rg = obj.reviewGraph as Record<string, unknown>;
+		let maxFiles: number | undefined;
+		if ("maxFiles" in rg) {
+			if (
+				typeof rg.maxFiles === "number" &&
+				Number.isFinite(rg.maxFiles) &&
+				rg.maxFiles > 0
+			) {
+			maxFiles = Math.max(
+				100,
+				Math.min(20_000, Math.round(rg.maxFiles)),
+			);
+			if (maxFiles !== rg.maxFiles) {
+				warnInvalidConfigOnce(
+					configPath,
+					`reviewGraph.maxFiles ${rg.maxFiles} clamped to [100, 20000]`,
+				);
+			}
+			} else {
+				warnInvalidConfigOnce(
+					configPath,
+					"reviewGraph.maxFiles must be a positive finite number",
+				);
+			}
+		}
+		reviewGraph = maxFiles !== undefined ? { maxFiles } : {};
+	} else if (obj.reviewGraph !== undefined) {
+		warnInvalidConfigOnce(
+			configPath,
+			"reviewGraph must be an object",
+		);
+	}
+
 	return {
 		ignore,
 		rules,
@@ -413,6 +471,7 @@ function parseConfigFile(configPath: string): PiLensProjectConfig {
 		autofix,
 		actionableWarnings,
 		maxProjectFiles,
+		reviewGraph,
 		raw,
 		configPath,
 	};

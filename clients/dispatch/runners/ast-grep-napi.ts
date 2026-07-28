@@ -18,6 +18,7 @@ import {
 	type AstGrepRuleSource,
 	getAstGrepRuleSources,
 } from "../../sgconfig.js";
+import { logLatency } from "../../latency-logger.js";
 import { hasEslintConfig } from "../../tool-policy.js";
 import { enabledAuxiliaryLspServerIds } from "../auxiliary-lsp.js";
 import { classifyDefect } from "../diagnostic-taxonomy.js";
@@ -300,6 +301,28 @@ export function evaluateAstGrepRules(
 	const seenRuleIds = new Set<string>();
 	const suppressLinterOverlap = kind === "jsts" && hasEslintConfig(cwd);
 	const fileLang = ruleLanguageForFile(filePath);
+	// Unsupported-language skips are expected in bulk (every non-jsts rule in the
+	// catalog, e.g. ~30 Python rules) — aggregate them into ONE latency-log entry
+	// per evaluation instead of per-rule terminal lines (#282 follow-up).
+	const newlyUnsupported = new Map<string, string[]>();
+	const flushUnsupportedRuleSkips = (): void => {
+		if (newlyUnsupported.size === 0) return;
+		logLatency({
+			type: "phase",
+			phase: "astgrep_napi_unsupported_rules_skipped",
+			filePath,
+			durationMs: 0,
+			metadata: {
+				skippedByLanguage: Object.fromEntries(
+					Array.from(newlyUnsupported.entries(), ([language, ruleIds]) => [
+						language,
+						{ count: ruleIds.length, ruleIds },
+					]),
+				),
+			},
+		});
+		newlyUnsupported.clear();
+	};
 
 	// Shared with the raw sgconfig materializer so both surfaces walk the same
 	// workspace-rooted sources in the same precedence order.
@@ -328,6 +351,7 @@ export function evaluateAstGrepRules(
 				maxTotalDiagnostics,
 			)
 		) {
+			flushUnsupportedRuleSkips();
 			return diagnostics;
 		}
 		const duplicateSet = new Set(duplicates);
@@ -366,9 +390,9 @@ export function evaluateAstGrepRules(
 			) {
 				if (!unsupportedLanguageLog.has(rule.id)) {
 					unsupportedLanguageLog.add(rule.id);
-					log?.(
-						`ast-grep-napi: rule "${rule.id}" skipped — unsupported language "${lang}" for the NAPI fallback`,
-					);
+					const ids = newlyUnsupported.get(lang) ?? [];
+					ids.push(rule.id);
+					newlyUnsupported.set(lang, ids);
 				}
 				continue;
 			}
@@ -463,6 +487,7 @@ export function evaluateAstGrepRules(
 		}
 	}
 
+	flushUnsupportedRuleSkips();
 	return diagnostics;
 }
 

@@ -1,7 +1,12 @@
 import * as path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { FactStore } from "../../../../clients/dispatch/fact-store.js";
 import { createTempFile, setupTestEnvironment } from "../../test-utils.js";
+
+const logLatency = vi.fn();
+vi.mock("../../../../clients/latency-logger.js", () => ({
+	logLatency: (entry: unknown) => logLatency(entry),
+}));
 
 const RULES_DIR = path.join(process.cwd(), "rules", "ast-grep-rules", "rules");
 
@@ -113,25 +118,32 @@ describe("ast-grep NAPI utils: block passthrough (#663)", () => {
 			expect(fired).not.toContain("redundant-usestate-type");
 		});
 
-		it("logs unsupported-language rules once per rule", async () => {
+		it("aggregates unsupported-language skips into the latency log, never the terminal log", async () => {
+			logLatency.mockClear();
 			const logs: string[] = [];
 			await rulesFiredOn("const value = 1;\n", "sample.ts", (message) =>
 				logs.push(message),
 			);
-			const pythonLogs = logs.filter((message) =>
-				message.includes('rule "no-compile-call"'),
-			);
-			expect(pythonLogs).toHaveLength(1);
-			expect(pythonLogs[0]).toContain('unsupported language "python"');
+			// Bulk-expected skips (every non-jsts catalog rule) must not produce
+			// per-rule terminal lines — that spams the pi session (#282 follow-up).
+			expect(logs.filter((m) => m.includes("unsupported language"))).toHaveLength(0);
+			const entries = logLatency.mock.calls
+				.map(([entry]) => entry as { phase?: string; metadata?: Record<string, unknown> })
+				.filter((e) => e.phase === "astgrep_napi_unsupported_rules_skipped");
+			expect(entries).toHaveLength(1);
+			const python = (entries[0].metadata?.skippedByLanguage as Record<string, { count: number; ruleIds: string[] }>).python;
+			expect(python.ruleIds).toContain("no-compile-call");
+			expect(python.count).toBe(python.ruleIds.length);
 		});
 
-		it("logs an unsupported Python rule for a .py file", async () => {
+		it("logs each unsupported rule at most once across evaluations sharing a dedup set", async () => {
 			const env = setupTestEnvironment("pi-lens-utils-block-skip-");
 			try {
 				const filePath = createTempFile(env.tmpDir, "sample.py", "value = 1\n");
 				const { evaluateAstGrepRules } = await import(
 					"../../../../clients/dispatch/runners/ast-grep-napi.js"
 				);
+				logLatency.mockClear();
 				const logs: string[] = [];
 				const seen = new Set<string>();
 				const options = {
@@ -141,11 +153,15 @@ describe("ast-grep NAPI utils: block passthrough (#663)", () => {
 				const root = { findAll: () => [] };
 				evaluateAstGrepRules(filePath, root, env.tmpDir, "python", options);
 				evaluateAstGrepRules(filePath, root, env.tmpDir, "python", options);
-				const pythonLogs = logs.filter((message) =>
-					message.includes('rule "no-compile-call"'),
-				);
-				expect(pythonLogs).toHaveLength(1);
-				expect(pythonLogs[0]).toContain('unsupported language "python"');
+				expect(logs.filter((m) => m.includes("unsupported language"))).toHaveLength(0);
+				const entries = logLatency.mock.calls
+					.map(([entry]) => entry as { phase?: string; metadata?: Record<string, unknown> })
+					.filter((e) => e.phase === "astgrep_napi_unsupported_rules_skipped");
+				// Second evaluation sees the shared dedup set already populated and
+				// emits nothing — one aggregate entry total, not one per evaluation.
+				expect(entries).toHaveLength(1);
+				const languages = entries[0].metadata?.skippedByLanguage as Record<string, { ruleIds: string[] }>;
+				expect(languages.python.ruleIds).toContain("no-compile-call");
 			} finally {
 				env.cleanup();
 			}

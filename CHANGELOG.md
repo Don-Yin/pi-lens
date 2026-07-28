@@ -23,6 +23,8 @@ All notable changes to pi-lens will be documented in this file.
 
 ### Fixed
 
+- **NAPI fallback unsupported-rule skips no longer spam the session log** (refs #282) — the per-rule terminal lines (one for each of the ~30 non-jsts catalog rules) are replaced by a single aggregated `astgrep_napi_unsupported_rules_skipped` entry in `latency.log` carrying per-language counts and rule ids.
+
 - **Missing tree-sitter defect-class metadata is now covered** (refs #863) — loop-termination and `finally` control-flow rules now declare their taxonomy classes, keeping the rule audit complete.
 
 - **MCP smoke deadlines scale under CI load (refs #860)** — the shared MCP

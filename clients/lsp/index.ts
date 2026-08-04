@@ -32,6 +32,10 @@ import type {
 	LSPClientInfo,
 	LSPShutdownOptions,
 } from "./client.js";
+import {
+	recordLspMutation,
+	type LspMutationContext,
+} from "../lsp-mutation.js";
 import { createLSPClient } from "./client.js";
 import { getServersForFileWithConfig, getServerInitOverride } from "./config.js";
 import { getLanguageId } from "./language.js";
@@ -2803,6 +2807,7 @@ export class LSPService {
 		filePath: string | undefined,
 		command: string,
 		args?: unknown[],
+		mutationContext?: LspMutationContext,
 	): Promise<{ executed: boolean; result?: unknown; reason?: string }> {
 		if (filePath) {
 			const spawned = await this.getClientForFile(
@@ -2812,11 +2817,11 @@ export class LSPService {
 			if (!spawned) {
 				return { executed: false, reason: "no LSP server for file" };
 			}
-			return spawned.client.executeCommand(command, args);
+			return spawned.client.executeCommand(command, args, mutationContext);
 		}
 		const first = this.state.clients.values().next().value;
 		if (!first) return { executed: false, reason: "no active LSP server" };
-		return first.executeCommand(command, args);
+		return first.executeCommand(command, args, mutationContext);
 	}
 
 	/**
@@ -2952,7 +2957,7 @@ export class LSPService {
 	async renameFile(
 		oldFilePath: string,
 		newFilePath: string,
-		options: { cwd: string; apply?: boolean },
+		options: { cwd: string; apply?: boolean; mutationContext?: LspMutationContext },
 	): Promise<LSPRenameFileResult> {
 		const cwd = options.cwd;
 		const apply = options.apply ?? false;
@@ -3006,7 +3011,25 @@ export class LSPService {
 			};
 		}
 
-		const applied = await applyWorkspaceEdit(merged.edit, cwd);
+		let applied;
+		try {
+			applied = await applyWorkspaceEdit(merged.edit, cwd, {
+				mutationContext: options.mutationContext,
+				observe: false,
+			});
+		} catch (err) {
+			if (options.mutationContext) {
+				const partial = (err as { appliedWorkspaceEdit?: typeof applied })
+					.appliedWorkspaceEdit;
+				if (partial) {
+					recordLspMutation(options.mutationContext, {
+						results: [partial],
+						status: "failed",
+					});
+				}
+			}
+			throw err;
+		}
 		const openDocuments = activeClients
 			.filter(({ client }) => client.isDocumentOpen(oldFilePath))
 			.map(({ serverId, client }) => ({
@@ -3019,15 +3042,23 @@ export class LSPService {
 			openDocuments.map(async ({ serverId, client }) => {
 				try {
 					await client.closeDocument(oldFilePath);
+					return undefined;
 				} catch (err) {
 					closeFailures.push({
 						serverId,
 						error: err instanceof Error ? err.message : String(err),
 					});
+					return undefined;
 				}
 			}),
 		);
 		if (closeFailures.length > 0) {
+			if (options.mutationContext) {
+				recordLspMutation(options.mutationContext, {
+					results: [applied],
+					status: "failed",
+				});
+			}
 			// Do not rename or send didRenameFiles while any server still has the
 			// old document open. Re-open/resync every affected client so a partial
 			// close cannot leave an in-memory document behind the disk contents.
@@ -3041,8 +3072,18 @@ export class LSPService {
 				`workspace/didClose failed; rename aborted: ${closeFailures.map((failure) => `${failure.serverId}: ${failure.error}`).join("; ")}`,
 			);
 		}
-		await fs.mkdir(path.dirname(newFilePath), { recursive: true });
-		await fs.rename(oldFilePath, newFilePath);
+		try {
+			await fs.mkdir(path.dirname(newFilePath), { recursive: true });
+			await fs.rename(oldFilePath, newFilePath);
+		} catch (err) {
+			if (options.mutationContext) {
+				recordLspMutation(options.mutationContext, {
+					results: [applied],
+					status: "failed",
+				});
+			}
+			throw err;
+		}
 		const relOld =
 			path.relative(cwd, oldFilePath).replace(/\\/g, "/") ||
 			path.basename(oldFilePath);
@@ -3060,14 +3101,44 @@ export class LSPService {
 					} else {
 						await client.didRenameFiles(oldFilePath, newFilePath);
 					}
+					return undefined;
 				} catch (err) {
 					didRenameFailures.push({
 						serverId,
 						error: err instanceof Error ? err.message : String(err),
 					});
+					return undefined;
 				}
 			}),
 		);
+
+		const files = [...new Set([...applied.files, oldFilePath, newFilePath])];
+		if (options.mutationContext) {
+			recordLspMutation(options.mutationContext, {
+				results: [
+					{
+						...applied,
+						files,
+						operationTotal: applied.operationTotal + 1,
+						appliedOperationTotal: applied.appliedOperationTotal + 1,
+						appliedOperationIndexes: [
+							...applied.appliedOperationIndexes,
+							applied.operationTotal,
+						],
+						operationCounts: {
+							...applied.operationCounts,
+							rename: applied.operationCounts.rename + 1,
+						},
+						fileDetails: [
+							...applied.fileDetails,
+							{ filePath: oldFilePath, range: { start: 1, end: 1 }, importsChanged: true },
+							{ filePath: newFilePath, range: { start: 1, end: 1 }, importsChanged: true },
+						],
+					},
+				],
+				status: "success",
+			});
+		}
 
 		return {
 			applied: true,
@@ -3078,7 +3149,7 @@ export class LSPService {
 			inputEditCount: merged.inputEditCount,
 			summary,
 			descriptions: [...applied.descriptions, renameDescription],
-			files: [...new Set([...applied.files, oldFilePath, newFilePath])],
+			files,
 		};
 	}
 

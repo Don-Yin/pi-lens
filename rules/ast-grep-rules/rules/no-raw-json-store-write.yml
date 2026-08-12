@@ -1,0 +1,27 @@
+id: no-raw-json-store-write
+language: TypeScript
+severity: warning
+message: "Use the atomic write seam for JSON stores instead of writeFileSync"
+note: |
+  JSON-backed durable state must be written through clients/atomic-write.ts so
+  concurrent writers cannot publish a torn file. This dogfood rule covers the
+  direct writeFileSync(path, JSON.stringify(data)) shape. Build scripts and the
+  installer's wx lock writes are intentionally outside this rule's scope.
+ignores:
+  - "clients/atomic-write.ts"
+  - "clients/installer/index.ts"
+  - "scripts/**"
+rule:
+  any:
+    - pattern: writeFileSync($PATH, JSON.stringify($DATA))
+    - pattern: $FS.writeFileSync($PATH, JSON.stringify($DATA))
+    - kind: expression_statement
+      has:
+        pattern: writeFileSync($PATH, $PAYLOAD)
+      follows:
+        pattern: const $PAYLOAD = JSON.stringify($DATA)
+    - kind: expression_statement
+      has:
+        pattern: $FS.writeFileSync($PATH, $PAYLOAD)
+      follows:
+        pattern: const $PAYLOAD = JSON.stringify($DATA)

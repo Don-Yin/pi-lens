@@ -1,0 +1,7 @@
+id: no-win32-isabsolute-for-qualification
+valid:
+  - "isFullyQualified(filePath)"
+  - "path.posix.isAbsolute(filePath)"
+invalid:
+  - "path.win32.isAbsolute(filePath)"
+  - "win32.isAbsolute(filePath)"

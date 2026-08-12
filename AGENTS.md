@@ -1142,6 +1142,8 @@ The shipped ast-grep baseline that runs on every file dispatch is composed from 
 
 A target repository that supplies its own `sgconfig.yml` / `sgconfig.yaml` at the workspace root takes precedence — pi-lens respects the project config instead of injecting its baseline.
 
+**Dogfood rule slice #1158:** `no-raw-json-store-write.yml` and `no-win32-isabsolute-for-qualification.yml` live in the native tree and use `ignores:` for deliberate implementation/build boundaries. Their behavioral contracts are the matching `rule-tests/<id>-test.yml` fixtures, run by `ast-grep test`; production false-positive scans should cover `clients/`, `tools/`, and `mcp/` separately from test/build fixtures. Rule 2 is written for the post-#1213 world: `clients/path-utils.ts` owns the underlying `win32.isAbsolute` parser call behind `isFullyQualified()` and is intentionally excluded. Shapes 3 and 4 remain future dogfood slices.
+
 ## Tree-sitter rules
 
 Rules live in `rules/tree-sitter-queries/<language>/`. Disabled rules are in `rules/tree-sitter-queries/<language>-disabled/` — they load in tests (via `getAllQueries()`) but are excluded from the production dispatch runner (which calls `getQueriesForLanguage("typescript")`).

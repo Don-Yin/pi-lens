@@ -1,0 +1,16 @@
+id: no-win32-isabsolute-for-qualification
+language: TypeScript
+severity: warning
+message: "Use isFullyQualified for path qualification instead of win32.isAbsolute"
+note: |
+  Qualification must follow the input path's shape. Use clients/path-utils.ts
+  isFullyQualified(), which distinguishes drive-absolute, UNC, rooted-relative,
+  POSIX-absolute, and relative paths across host operating systems. The
+  implementation of isFullyQualified itself is excluded because it is the
+  compatibility seam that owns the win32 parser call.
+ignores:
+  - "clients/path-utils.ts"
+rule:
+  any:
+    - pattern: path.win32.isAbsolute($P)
+    - pattern: win32.isAbsolute($P)

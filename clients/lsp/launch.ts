@@ -20,6 +20,10 @@ import { isTestMode } from "../env-utils.js";
 import { getGlobalPiLensDir } from "../file-utils.js";
 import { findGlobalBinary } from "../package-manager.js";
 import { redactSecrets } from "../redact/secrets.js";
+import {
+	SpawnFailureError,
+	classifySpawnFailure,
+} from "../safe-spawn.js";
 import { getRubyVersionDirNamesAsync } from "./ruby-drive-dirs.js";
 
 export interface LSPProcess {
@@ -421,11 +425,11 @@ function _attachErrorHandler(
 		}
 
 		// If we have a reject function and this is an immediate spawn error, reject
-		if (
-			rejectOnImmediateError &&
-			(err as NodeJS.ErrnoException).code === "ENOENT"
-		) {
-			rejectOnImmediateError(err);
+		if (rejectOnImmediateError) {
+			const failure = classifySpawnFailure(err, {
+				cwd: logContext?.cwd,
+			});
+			if (failure !== "spawn-failed") rejectOnImmediateError(err);
 		}
 	});
 
@@ -588,12 +592,22 @@ export async function launchLSP(
 			if (globalBinPath && globalBinPath !== spawnCommand) {
 				// Recompute needsShell for the resolved global path
 				const needsShellGlobal = computeNeedsShell(globalBinPath);
-				proc = trySpawn(globalBinPath, args, cwd, env, needsShellGlobal);
+				try {
+					proc = trySpawn(globalBinPath, args, cwd, env, needsShellGlobal);
+				} catch (retryError) {
+					const cause =
+						retryError instanceof Error
+							? retryError
+							: new Error(String(retryError));
+					throw new SpawnFailureError(cause.message, cause, { cwd });
+				}
 			} else {
-				throw err;
+				const cause = err instanceof Error ? err : new Error(String(err));
+				throw new SpawnFailureError(cause.message, cause, { cwd });
 			}
 		} else {
-			throw err;
+			const cause = err instanceof Error ? err : new Error(String(err));
+			throw new SpawnFailureError(cause.message, cause, { cwd });
 		}
 	}
 
@@ -633,13 +647,19 @@ export async function launchLSP(
 			let settled = false;
 
 			// Attach error handler that can reject for immediate errors
-			proc.on("error", (err: Error & { code?: string }) => {
-				if (!settled && (err.code === "ENOENT" || err.code === "EINVAL")) {
+			proc.on("error", (err: Error) => {
+				if (!settled) {
 					settled = true;
+					const failure = classifySpawnFailure(err, { cwd });
+					const message =
+						failure === "tool-not-found"
+							? `LSP server binary not found: ${command}. Install it or check your PATH.`
+							: `Failed to spawn LSP server ${command}: ${err.message}`;
 					reject(
-						new Error(
-							`LSP server binary not found: ${command}. ` +
-								`Install it or check your PATH.${formatStartupStderr(startupStderr)}`,
+						new SpawnFailureError(
+							`${message}${formatStartupStderr(startupStderr)}`,
+							err,
+							{ cwd },
 						),
 					);
 				}

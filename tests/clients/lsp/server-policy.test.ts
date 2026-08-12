@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SpawnFailureError } from "../../../clients/safe-spawn.js";
 import { removeTempDirSync } from "../test-utils.js";
 
 // Set test mode to isolate logging from production logs
@@ -10,6 +11,10 @@ process.env.PI_LENS_TEST_MODE = "1";
 const ensureTool = vi.fn();
 const getToolEnvironment = vi.fn(async () => ({}));
 const launchLSP = vi.fn();
+const missingCommandError = (): SpawnFailureError => {
+	const cause = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+	return new SpawnFailureError("ENOENT: command not found", cause);
+};
 
 vi.mock("../../../clients/installer/index.js", () => ({
 	ensureTool,
@@ -277,7 +282,7 @@ describe("lsp server policy", () => {
 		);
 		dirs.push(tmp);
 
-		launchLSP.mockRejectedValue(new Error("ENOENT: command not found"));
+		launchLSP.mockRejectedValue(missingCommandError());
 
 		const spawned = await CSharpServer.spawn(tmp, { allowInstall: false });
 		expect(spawned).toBeUndefined();
@@ -519,7 +524,7 @@ describe("lsp server policy", () => {
 		);
 		dirs.push(tmp);
 
-		launchLSP.mockRejectedValue(new Error("ENOENT: command not found"));
+		launchLSP.mockRejectedValue(missingCommandError());
 
 		const spawned = await BashServer.spawn(tmp, { allowInstall: false });
 		expect(spawned).toBeUndefined();
@@ -555,7 +560,7 @@ describe("lsp server policy", () => {
 		fs.writeFileSync(path.join(tmp, "package.json"), "{}\n");
 
 		process.env.PI_LENS_DISABLE_LSP_INSTALL = "1";
-		launchLSP.mockRejectedValue(new Error("ENOENT: command not found"));
+		launchLSP.mockRejectedValue(missingCommandError());
 
 		const spawned = await SvelteServer.spawn(tmp);
 		expect(spawned?.process).toBeUndefined();
@@ -569,7 +574,7 @@ describe("lsp server policy", () => {
 		dirs.push(tmp);
 		fs.writeFileSync(path.join(tmp, "package.json"), "{}\n");
 
-		launchLSP.mockRejectedValue(new Error("ENOENT: command not found"));
+		launchLSP.mockRejectedValue(missingCommandError());
 
 		const spawned = await SvelteServer.spawn(tmp, { allowInstall: false });
 		expect(spawned?.process).toBeUndefined();
@@ -823,7 +828,7 @@ describe("lsp server policy", () => {
 		ensureTool.mockResolvedValue(path.join(tmp, "bin", "zls.exe"));
 		launchLSP.mockImplementation(async (command: string) => {
 			if (command === "zls") {
-				throw new Error("ENOENT: command not found");
+				throw missingCommandError();
 			}
 			if (command.endsWith(path.join("bin", "zls.exe"))) {
 				return {
@@ -1069,7 +1074,7 @@ describe("lsp server policy", () => {
 			launchLSP.mockImplementation(async (command: string) => {
 				calls.push(`launch(${command})`);
 				if (calls.length <= 2) {
-					throw new Error("BROKEN");
+					throw missingCommandError();
 				}
 				if (command === MANAGED) {
 					return {
@@ -1080,7 +1085,7 @@ describe("lsp server policy", () => {
 						pid: 9999,
 					};
 				}
-				throw new Error(`unexpected: ${command} (call #${calls.length})`);
+				throw missingCommandError();
 			});
 
 			ensureTool.mockImplementation(

@@ -32,6 +32,13 @@ format change cannot drift from garbage collection. The installer probe cache
 keeps its older richer lock because quarantine recovery and install-lifetime
 aging predate the short-commit durable-store seam. (#1209, #1212)
 
+Spawn consumers classify launch failures only through `SpawnResult.failure` or
+`spawnFailureKind(error)` from `clients/safe-spawn.ts`; never infer tool absence
+from `error.code` or message text. `tool-not-found` alone may trigger install or
+reinstall. `cwd-unresolvable`, `permission-denied`, `spawn-rejected`, and
+`spawn-failed` preserve distinct intent, while `SpawnFailureError.cause` retains
+the original OS error for diagnostics. (#1214)
+
 ## Issue and PR design contract
 
 - **Design the state space before coding.** For stateful, ordered, resource-mutating, or security-sensitive work, write the invariants, supported transitions, explicit deferrals, and a cross-product test matrix before implementation. Examples are not enough: cover operation order, preview/apply, validation/normalization/execution seams, failure atomicity, observability bounds, and OS/path/encoding axes. If adversarial review finds repeated cross-product defects, stop patching one symptom at a time and return to the model.

@@ -71,7 +71,7 @@ describe("RuffClient.ensureAvailable() — in-flight dedupe (#120)", () => {
 			.mockResolvedValueOnce({
 				status: 1,
 				error: Object.assign(new Error("not found"), { code: "ENOENT" }),
-				failure: "spawn",
+				failure: "tool-not-found",
 				stdout: "",
 				stderr: "",
 			})
@@ -97,7 +97,7 @@ describe("RuffClient.ensureAvailable() — in-flight dedupe (#120)", () => {
 		safeSpawnAsync.mockResolvedValue({
 			status: 1,
 			error: Object.assign(new Error("not found"), { code: "ENOENT" }),
-			failure: "spawn",
+			failure: "tool-not-found",
 			stdout: "",
 			stderr: "",
 		});

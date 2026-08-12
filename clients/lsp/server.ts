@@ -39,7 +39,11 @@ import { findLocalSgconfig, resolveBaselineSgconfig } from "../sgconfig.js";
 import { findLocalTyposConfig } from "../typos-config.js";
 import { resolvePackagePath } from "../package-root.js";
 import { resolveAstGrepNativeExe } from "./wait-policy/index.js";
-import { isCommandAvailableAsync, safeSpawnAsync } from "../safe-spawn.js";
+import {
+	isCommandAvailableAsync,
+	safeSpawnAsync,
+	spawnFailureKind,
+} from "../safe-spawn.js";
 import { type LSPProcess, launchLSP } from "./launch.js";
 import { createLombokJdtlsArgs } from "./lombok.js";
 import { resolveJavaRuntimeEnv } from "./jvm-runtime.js";
@@ -131,12 +135,7 @@ function canInstall(allowInstall?: boolean): boolean {
 }
 
 function isCommandNotFoundError(error: unknown): boolean {
-	const msg = String(error);
-	return (
-		msg.includes("not found") ||
-		msg.includes("ENOENT") ||
-		msg.includes("not recognized")
-	);
+	return spawnFailureKind(error) === "tool-not-found";
 }
 
 const DIRECT_LSP_NEGATIVE_TTL_MS = Math.max(
@@ -237,7 +236,7 @@ export async function resolveAndLaunch(
 	let lastRuntimeFailure: Error | undefined;
 	const trackRuntimeFailure = (err: unknown): void => {
 		const message = err instanceof Error ? err.message : String(err);
-		if (!isCommandNotFoundError(message)) {
+		if (!isCommandNotFoundError(err)) {
 			lastRuntimeFailure = err instanceof Error ? err : new Error(message);
 		}
 	};
@@ -403,7 +402,7 @@ export async function resolveAndLaunch(
 				// caches and download a managed copy from the registry.
 				const looksPathResolved =
 					!installed.includes("/") && !installed.includes("\\");
-				if (looksPathResolved) {
+				if (looksPathResolved && isCommandNotFoundError(err)) {
 					logSessionStart(
 						`lsp launch managed retry force-reinstall tool=${spec.managedToolId}`,
 					);

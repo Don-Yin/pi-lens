@@ -400,12 +400,7 @@ export class SgRunner {
 	}): SgFailureKind | undefined {
 		if (result.failure === "aborted") return "aborted";
 		if (result.failure === "timeout") return "timeout";
-		if (
-			result.error &&
-			/ENOENT|not found|not installed/i.test(result.error.message)
-		) {
-			return "unavailable";
-		}
+		if (result.failure === "tool-not-found") return "unavailable";
 		return result.error ? "cli-failure" : undefined;
 	}
 

@@ -29,6 +29,7 @@ describe("SgRunner", () => {
 		safeSpawnAsync.mockResolvedValue({
 			status: 1,
 			error: new Error("not found"),
+			failure: "tool-not-found",
 			stdout: "",
 			stderr: "",
 		});
@@ -61,6 +62,7 @@ describe("SgRunner", () => {
 				.mockResolvedValueOnce({
 					status: 1,
 					error: new Error("not found"),
+					failure: "tool-not-found",
 					stdout: "",
 					stderr: "",
 				})
@@ -73,6 +75,7 @@ describe("SgRunner", () => {
 				.mockResolvedValueOnce({
 					status: 1,
 					error: new Error("not found"),
+					failure: "tool-not-found",
 					stdout: "",
 					stderr: "",
 				});

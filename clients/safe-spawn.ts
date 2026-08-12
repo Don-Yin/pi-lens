@@ -33,7 +33,76 @@ export interface SpawnResourceUsage {
 	peakRssBytes: number;
 }
 
-export type SpawnFailureKind = "aborted" | "timeout" | "spawn" | "signal";
+export type SpawnFailureKind =
+	| "aborted"
+	| "timeout"
+	| "signal"
+	| "tool-not-found"
+	| "cwd-unresolvable"
+	| "permission-denied"
+	| "spawn-rejected"
+	| "spawn-failed";
+
+export interface SpawnFailureContext {
+	/** The cwd passed to spawn. Used only to disambiguate ENOENT/ENOTDIR. */
+	cwd?: string;
+}
+
+/**
+ * Classify an OS spawn rejection once, at the process boundary. Consumers must
+ * switch on this intent-level result rather than re-interpreting errno strings.
+ * The original error remains on SpawnResult.error (or SpawnFailureError.cause).
+ */
+export function classifySpawnFailure(
+	error: unknown,
+	context: SpawnFailureContext = {},
+): Exclude<SpawnFailureKind, "aborted" | "timeout" | "signal"> {
+	const code = (error as NodeJS.ErrnoException | undefined)?.code;
+	if (code === "EACCES" || code === "EPERM") return "permission-denied";
+	if (code === "EAGAIN" || code === "EBUSY") return "spawn-rejected";
+	if (code === "ENOENT" || code === "ENOTDIR") {
+		if (context.cwd !== undefined) {
+			try {
+				if (!fs.statSync(context.cwd).isDirectory()) return "cwd-unresolvable";
+			} catch {
+				return "cwd-unresolvable";
+			}
+		}
+		return "tool-not-found";
+	}
+	return "spawn-failed";
+}
+
+export class SpawnFailureError extends Error {
+	readonly failure: Exclude<
+		SpawnFailureKind,
+		"aborted" | "timeout" | "signal"
+	>;
+	declare readonly cause: Error;
+
+	constructor(message: string, cause: Error, context: SpawnFailureContext = {}) {
+		super(message, { cause });
+		this.name = "SpawnFailureError";
+		this.cause = cause;
+		this.failure = classifySpawnFailure(cause, context);
+		const code = (cause as NodeJS.ErrnoException).code;
+		if (code !== undefined) (this as NodeJS.ErrnoException).code = code;
+	}
+}
+
+export function spawnFailureKind(error: unknown): SpawnFailureKind | undefined {
+	const failure = (error as { failure?: unknown } | undefined)?.failure;
+	return failure === "aborted" ||
+		failure === "timeout" ||
+		failure === "signal" ||
+		failure === "tool-not-found" ||
+		failure === "cwd-unresolvable" ||
+		failure === "permission-denied" ||
+		failure === "spawn-rejected" ||
+		failure === "spawn-failed"
+		? failure
+		: undefined;
+}
 
 export interface SpawnResult {
 	stdout: string;
@@ -993,7 +1062,7 @@ export async function safeSpawnAsync(
 				stderr: "",
 				status: null,
 				error: resolutionError,
-				failure: "spawn",
+				failure: classifySpawnFailure(resolutionError, { cwd: spawnCwd }),
 			});
 			return;
 		}
@@ -1020,7 +1089,7 @@ export async function safeSpawnAsync(
 				stderr: "",
 				status: null,
 				error: err instanceof Error ? err : new Error(String(err)),
-				failure: "spawn",
+				failure: classifySpawnFailure(err, { cwd: spawnCwd }),
 			});
 			return;
 		}
@@ -1202,7 +1271,9 @@ export async function safeSpawnAsync(
 			if (escalationTimer) clearTimeout(escalationTimer);
 			if (child.pid) lifetimeState.pids.delete(child.pid);
 			const resourceUsage = finishResourceUsage();
-			let failure: SpawnFailureKind = "spawn";
+			let failure: SpawnFailureKind = classifySpawnFailure(err, {
+				cwd: spawnCwd,
+			});
 			if (aborted) failure = "aborted";
 			else if (timedOut) failure = "timeout";
 			resolve({
@@ -1327,6 +1398,7 @@ export function safeSpawn(
 				stderr: "",
 				status: null,
 				error: synthesizeEnoentError(command),
+				failure: "tool-not-found",
 			};
 		}
 
@@ -1351,6 +1423,7 @@ export function safeSpawn(
 							`cmd.exe /c command line (CWE-78, #817). Rename/quote the ` +
 							"value or invoke the tool without going through cmd.exe.",
 					),
+					failure: "spawn-failed",
 				};
 			}
 			spawnCmd = `${process.env.SystemRoot ?? "C:\\Windows"}\\System32\\cmd.exe`;
@@ -1382,6 +1455,9 @@ export function safeSpawn(
 			stderr: result.stderr?.toString() || "",
 			status: result.status,
 			error: result.error,
+			failure: result.error
+				? classifySpawnFailure(result.error, { cwd: spawnCwd })
+				: undefined,
 		};
 	}
 
@@ -1404,6 +1480,9 @@ export function safeSpawn(
 		stderr: result.stderr?.toString() || "",
 		status: result.status,
 		error: result.error,
+		failure: result.error
+			? classifySpawnFailure(result.error, { cwd: options?.cwd })
+			: undefined,
 	};
 }
 

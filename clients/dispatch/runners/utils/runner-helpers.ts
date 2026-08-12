@@ -390,16 +390,14 @@ export function createAvailabilityChecker(
 			}
 
 			cache.available = false;
-			const errorCode = (result.error as NodeJS.ErrnoException | undefined)?.code;
-			if (result.failure === "spawn" && errorCode === "ENOENT") {
+			if (result.failure === "tool-not-found") {
 				resetPathWalkMemo();
 				cache.outcome = "missing";
 			} else if (
 				result.failure === "timeout" ||
 				result.failure === "aborted" ||
 				result.failure === "signal" ||
-				errorCode === "EAGAIN" ||
-				errorCode === "EBUSY"
+				result.failure === "spawn-rejected"
 			) {
 				cache.outcome = "transient";
 			} else {

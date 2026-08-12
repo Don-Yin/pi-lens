@@ -176,7 +176,7 @@ describe("runner-helpers availability checker", () => {
 			stderr: "not found",
 			status: 1,
 			error: Object.assign(new Error("missing"), { code: "ENOENT" }),
-			failure: "spawn",
+			failure: "tool-not-found",
 		});
 		vi.mocked(installerMod.ensureTool).mockResolvedValue("ruff");
 		const checker = createAvailabilityChecker("ruff");
@@ -273,7 +273,7 @@ describe("runner-helpers availability checker", () => {
 				stderr: "missing",
 				status: null,
 				error: Object.assign(new Error("missing"), { code: "ENOENT" }),
-				failure: "spawn",
+				failure: "tool-not-found",
 			});
 		vi.mocked(installerMod.isSpawnableCommand).mockResolvedValueOnce(false);
 		// Scoped count: earlier tests in this file legitimately trigger the
@@ -315,7 +315,7 @@ describe("runner-helpers availability checker", () => {
 			stderr: "",
 			status: null,
 			error: Object.assign(new Error("spawn missing ENOENT"), { code: "ENOENT" }),
-			failure: "spawn",
+			failure: "tool-not-found",
 		});
 		vi.mocked(installerMod.ensureTool).mockResolvedValue(undefined);
 
@@ -353,7 +353,7 @@ describe("runner-helpers availability checker", () => {
 			stderr: "",
 			status: null,
 			error: Object.assign(new Error("spawn missing ENOENT"), { code: "ENOENT" }),
-			failure: "spawn",
+			failure: "tool-not-found",
 		});
 		const checker = createAvailabilityChecker("missing-tool-success");
 

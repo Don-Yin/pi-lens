@@ -18,6 +18,7 @@ import {
 import { getSourceFiles } from "./scan-utils.js";
 import { readDirEntriesSafe, shouldRecurseIntoDir } from "./source-walker.js";
 import { findNearestDirWithAnyBasename } from "./workspace-topology.js";
+import { createDeadline, yieldIfOverBudget } from "./cooperative-budget.js";
 
 /** Every registered kind participates in project-language detection (#894). */
 export const SUPPORTED_FILE_KINDS: readonly FileKind[] = Object.keys(
@@ -307,11 +308,11 @@ const MAX_WARMUP_SOURCE_FILES = 2000;
 // at the default budget it tolerates up to ~20k data/doc files ahead of the
 // code dirs before giving up on finding more code files.
 const MATCHED_FILES_CEILING_FACTOR = 10;
+const WARMUP_SOURCE_WALK_BUDGET_MS = 8;
 
 export async function collectSourceFilesForWarmup(
 	rootDir: string,
 	maxFiles = MAX_WARMUP_SOURCE_FILES,
-	yieldEvery = 100,
 ): Promise<string[]> {
 	const root = path.resolve(rootDir);
 	const ignoreMatcher = getProjectIgnoreMatcher(root);
@@ -335,7 +336,7 @@ export async function collectSourceFilesForWarmup(
 	const codeOut: string[] = [];
 	const nonCodeOut: string[] = [];
 	let matchedSeen = 0;
-	let processedSinceYield = 0;
+	const deadline = createDeadline(WARMUP_SOURCE_WALK_BUDGET_MS);
 
 	walk: while (stack.length > 0) {
 		const current = stack.pop();
@@ -369,10 +370,7 @@ export async function collectSourceFilesForWarmup(
 					break walk;
 				}
 			}
-			if (++processedSinceYield % yieldEvery === 0) {
-				// See countSourceFilesWithinLimitAsync for why setImmediate.
-				await new Promise<void>((resolve) => setImmediate(resolve));
-			}
+			if (deadline.expired()) await yieldIfOverBudget(deadline);
 		}
 	}
 	return [...codeOut, ...nonCodeOut];

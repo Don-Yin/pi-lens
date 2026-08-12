@@ -58,6 +58,7 @@ import {
 import { clearTsconfigPathsCache } from "./review-graph/tsconfig-paths.js";
 import type { RuffClient } from "./ruff-client.js";
 import { scanProjectRules } from "./rules-scanner.js";
+import { createDeadline, yieldIfOverBudget } from "./cooperative-budget.js";
 import type { RuntimeCoordinator } from "./runtime-coordinator.js";
 import type { RustClient } from "./rust-client.js";
 import { resetSafeSpawnWindowsCommandCache } from "./safe-spawn.js";
@@ -635,13 +636,11 @@ async function collectTodoBaselineItems(
 		// blocks the event loop before the per-file scan loop below even starts.
 		const files = await getSourceFilesAsync(analysisRoot, true);
 		if (!stillCurrent()) return items;
-		let processedSinceYield = 0;
+		const deadline = createDeadline(8);
 		for (const file of files) {
 			if (!stillCurrent()) return items;
 			scanOneTodoFile(scanner, file, items);
-			if (++processedSinceYield % 30 === 0) {
-				await new Promise<void>((resolve) => setImmediate(resolve));
-			}
+			if (deadline.expired()) await yieldIfOverBudget(deadline);
 		}
 	} catch {
 		const todoResult = scanner.scanDirectory(analysisRoot);

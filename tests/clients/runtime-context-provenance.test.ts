@@ -53,6 +53,75 @@ describe("advisory provenance at context delivery (#1413)", () => {
 		expect(consumed?.messages[0]?.content).not.toContain("Historical finding");
 	});
 
+	it("keeps no-metadata delivery byte-compatible", () => {
+		const { env, runtime, cache, provenance } = setup();
+		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);
+		const baseline = peekTurnEndFindings(cache, env.tmpDir, runtime);
+		const emptyCapacity = peekTurnEndFindings(cache, env.tmpDir, runtime, {});
+		expect(emptyCapacity).toEqual(baseline);
+	});
+
+	it("adds exact model capacity without suppressing root-cause remediation", () => {
+		const { env, runtime, cache, provenance } = setup();
+		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);
+		const capacity = {
+			provider: "anthropic",
+			modelId: "claude-opus",
+			contextWindow: 200_000,
+			maxOutputTokens: 32_000,
+			contextTokens: 120_000,
+		};
+		const peeked = peekTurnEndFindings(cache, env.tmpDir, runtime, capacity);
+		const consumed = consumeTurnEndFindings(cache, env.tmpDir, runtime, capacity);
+		expect(peeked).toEqual(consumed);
+		const content = consumed?.messages[0]?.content ?? "";
+		expect(content).toContain("Model capacity: anthropic/claude-opus");
+		expect(content).toContain("context window 200,000 tokens");
+		expect(content).toContain("max output 32,000 tokens");
+		expect(content).toContain("current context 120,000/200,000 tokens (60%)");
+		expect(content).toContain("fix root causes");
+		expect(content).toContain("do not suppress, defer, or mark findings resolved");
+		expect(content).toContain("lens_diagnostics with paths");
+	});
+
+	it("renders only validated fields for partial capacity metadata", () => {
+		const { env, runtime, cache, provenance } = setup();
+		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);
+		const content = consumeTurnEndFindings(cache, env.tmpDir, runtime, {
+			modelId: "small-model",
+			maxOutputTokens: 4_096,
+		})?.messages[0]?.content ?? "";
+		expect(content).toContain("Model capacity: small-model, max output 4,096 tokens");
+		expect(content).not.toContain("context window");
+		expect(content).not.toContain("current context");
+	});
+
+	it("omits malformed capacity fields and leaves historical framing unchanged", () => {
+		const { env, runtime, cache, provenance } = setup();
+		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);
+		const current = consumeTurnEndFindings(cache, env.tmpDir, runtime, {
+			provider: "anthropic",
+			modelId: "claude-opus",
+			contextWindow: Number.NaN,
+			maxOutputTokens: -1,
+			contextTokens: 100,
+		})?.messages[0]?.content ?? "";
+		expect(current).not.toContain("Model capacity");
+		expect(current).not.toContain("context window");
+		expect(current).not.toContain("max output");
+		expect(current).not.toContain("current context");
+
+		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);
+		runtime.setTelemetryIdentity({ sessionId: "session-b" });
+		const historical = consumeTurnEndFindings(cache, env.tmpDir, runtime, {
+			provider: "anthropic",
+			modelId: "claude-opus",
+			contextWindow: 200_000,
+		})?.messages[0]?.content ?? "";
+		expect(historical).toContain("Historical finding");
+		expect(historical).not.toContain("Model capacity");
+	});
+
 	it("keeps unchanged blockers live across beginTurn and project sequence drift", () => {
 		const { env, runtime, cache, file, provenance } = setup();
 		cache.writeCache("turn-end-findings", { content: "finding", provenance }, env.tmpDir);

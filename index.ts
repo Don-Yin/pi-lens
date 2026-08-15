@@ -115,6 +115,7 @@ import {
 	consumeSessionStartGuidance,
 	consumeTestFindings,
 	consumeTurnEndFindings,
+	type DiagnosticModelCapacity,
 } from "./clients/runtime-context.js";
 import { RuntimeCoordinator } from "./clients/runtime-coordinator.js";
 import { handleSessionStart } from "./clients/runtime-session.js";
@@ -2538,7 +2539,16 @@ export default function (pi: ExtensionAPI) {
 		"context",
 		async (
 			event: { messages?: Array<{ role: string; content: unknown }> } | unknown,
-			ctx: { cwd?: string },
+			ctx: {
+				cwd?: string;
+				model?: {
+					provider?: unknown;
+					id?: unknown;
+					contextWindow?: unknown;
+					maxTokens?: unknown;
+				};
+				getContextUsage?: () => { tokens?: unknown } | undefined;
+			},
 		) => {
 			// #1018: context telemetry deliberately runs even when the lens or its
 			// injection toggle is off, so an A/B run has a no-injection observation.
@@ -2588,7 +2598,25 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 
-				const turnEndFindings = consumeTurnEndFindings(cacheManager, cwd, runtime);
+				let usage: { tokens?: unknown } | undefined;
+				try {
+					usage = ctx.getContextUsage?.();
+				} catch (err) {
+					dbg(`context: model usage unavailable: ${err}`);
+				}
+				const modelCapacity: DiagnosticModelCapacity = {
+					provider: ctx.model?.provider,
+					modelId: ctx.model?.id,
+					contextWindow: ctx.model?.contextWindow,
+					maxOutputTokens: ctx.model?.maxTokens,
+					contextTokens: usage?.tokens,
+				};
+				const turnEndFindings = consumeTurnEndFindings(
+					cacheManager,
+					cwd,
+					runtime,
+					modelCapacity,
+				);
 				const sessionGuidance = consumeSessionStartGuidance(cacheManager, cwd);
 				const testFindings = consumeTestFindings(cacheManager, cwd, runtime);
 				const agentNudge = consumeAgentNudge(dbg);

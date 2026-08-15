@@ -14,6 +14,69 @@ export const AUTOMATION_FRAMING =
 
 type ContextResult = { messages: Array<{ role: "user"; content: string }> };
 
+export interface DiagnosticModelCapacity {
+	provider?: unknown;
+	modelId?: unknown;
+	contextWindow?: unknown;
+	maxOutputTokens?: unknown;
+	contextTokens?: unknown;
+}
+
+function boundedLabel(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const label = value.trim();
+	return label.length > 0 ? label.slice(0, 160) : undefined;
+}
+
+function positiveTokenCount(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) && value > 0
+		? Math.floor(value)
+		: undefined;
+}
+
+function nonNegativeTokenCount(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0
+		? Math.floor(value)
+		: undefined;
+}
+
+function formatTokenCount(value: number): string {
+	return value.toLocaleString("en-US");
+}
+
+export function formatDiagnosticModelCapacity(
+	capacity: DiagnosticModelCapacity | undefined,
+): string | undefined {
+	if (!capacity) return undefined;
+	const provider = boundedLabel(capacity.provider);
+	const modelId = boundedLabel(capacity.modelId);
+	const contextWindow = positiveTokenCount(capacity.contextWindow);
+	const maxOutputTokens = positiveTokenCount(capacity.maxOutputTokens);
+	const contextTokens = nonNegativeTokenCount(capacity.contextTokens);
+	if (!contextWindow && !maxOutputTokens) return undefined;
+	const parts: string[] = [];
+	if (provider && modelId) parts.push(`${provider}/${modelId}`);
+	else if (modelId) parts.push(modelId);
+	else if (provider) parts.push(provider);
+	if (contextWindow) {
+		parts.push(`context window ${formatTokenCount(contextWindow)} tokens`);
+	}
+	if (maxOutputTokens) {
+		parts.push(`max output ${formatTokenCount(maxOutputTokens)} tokens`);
+	}
+	if (contextWindow && contextTokens !== undefined) {
+		const percentage = Math.round((contextTokens / contextWindow) * 100);
+		parts.push(
+			`current context ${formatTokenCount(contextTokens)}/${formatTokenCount(contextWindow)} tokens (${percentage}%)`,
+		);
+	}
+	return [
+		`Model capacity: ${parts.join(", ")}.`,
+		"Capacity changes batching only. For required fixes, fix root causes; do not suppress, defer, or mark findings resolved merely to fit this turn.",
+		"If the backlog does not fit, use lens_diagnostics with paths and resolve it in bounded batches while keeping unresolved findings live.",
+	].join("\n");
+}
+
 function historicalPrefix(provenance: AdvisoryProvenance | undefined): string {
 	return `Historical finding; workspace changed since capture; re-run to confirm. (${provenanceStamp(provenance)})`;
 }
@@ -28,12 +91,18 @@ function turnEndMessage(
 	content: string,
 	current: boolean,
 	provenance?: AdvisoryProvenance,
+	capacity?: DiagnosticModelCapacity,
 ): { role: "user"; content: string } {
+	if (!current) {
+		return {
+			role: "user",
+			content: `${AUTOMATION_FRAMING}${historicalPrefix(provenance)}\n\n${content}`,
+		};
+	}
+	const capacityGuidance = formatDiagnosticModelCapacity(capacity);
 	return {
 		role: "user",
-		content: current
-			? `${AUTOMATION_FRAMING}Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\n${content}`
-			: `${AUTOMATION_FRAMING}${historicalPrefix(provenance)}\n\n${content}`,
+		content: `${AUTOMATION_FRAMING}Address 🔴 blockers before continuing; ℹ️ advisories are informational only.${capacityGuidance ? `\n${capacityGuidance}` : ""}\n\n${content}`,
 	};
 }
 
@@ -42,6 +111,7 @@ export function peekTurnEndFindings(
 	cacheManager: CacheManager,
 	cwd: string,
 	runtime?: RuntimeCoordinator,
+	capacity?: DiagnosticModelCapacity,
 ): ContextResult | undefined {
 	const findings = cacheManager.readCache<Partial<TurnEndFindingsCache>>(
 		"turn-end-findings",
@@ -55,6 +125,7 @@ export function peekTurnEndFindings(
 			findings.data.content,
 			validation.status === "current",
 			findings.data.provenance,
+			capacity,
 		)],
 	};
 }
@@ -63,6 +134,7 @@ export function consumeTurnEndFindings(
 	cacheManager: CacheManager,
 	cwd: string,
 	runtime?: RuntimeCoordinator,
+	capacity?: DiagnosticModelCapacity,
 ): ContextResult | undefined {
 	const findings = cacheManager.readCache<Partial<TurnEndFindingsCache>>(
 		"turn-end-findings",
@@ -92,6 +164,7 @@ export function consumeTurnEndFindings(
 			findings.data.content,
 			validation.status === "current",
 			findings.data.provenance,
+			capacity,
 		)],
 	};
 }

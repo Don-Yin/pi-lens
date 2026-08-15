@@ -239,6 +239,7 @@ pi-lens hooks run on pi's event loop. Read the "Performance" section of `AGENTS.
 - The build-freshness guard (`tests/support/check-build-freshness.ts`) will fail fast if source `.ts` is newer than its `.js`.
 - For extension wiring tests, use `tests/support/pi-mock.ts`.
 - For live tool/LSP validation, use `scripts/smoke-tools.mjs` (opt-in, not a per-PR gate).
+- Walk/profile reach (what percent of the hot-path clients a representative tree actually executes) lives in `tests/clients/profiling-coverage.test.ts`, using `tests/support/v8-coverage.ts`. Occupancy tests still own event-loop stalls; do not fold this into `timingSensitiveInclude` unless it starts sampling `measureMaxSyncBlockMs` / `process.cpuUsage`.
 
 ## Other contribution areas
 

@@ -6,6 +6,8 @@ All notable changes to pi-lens will be documented in this file.
 
 ### Added
 
+- **Profiling coverage of the walk/profile hot path** — a V8 precise-coverage helper (`tests/support/v8-coverage.ts`) plus a representative source-tree workload (`tests/clients/profiling-coverage.test.ts`) report what percent of compiled client functions and blocks a collect/profile/count walk actually executes. Occupancy tests already guard event-loop stalls; this is the complementary reach metric so a workload that stops calling the walkers fails instead of silently profiling nothing. Thresholds sit below a measured local run.
+
 ### Changed
 
 ### Deprecated

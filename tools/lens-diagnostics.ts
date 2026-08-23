@@ -2286,29 +2286,25 @@ function formatAllMode(
 	const ignoreFile = createCurrentIgnoreFilter(cwd);
 	const includeFile = (filePath: string) =>
 		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
-	// #755: mode=full already ran the full disposition + inline-suppression
-	// filter (applyInlineSuppressionsToSummaries, file content in hand); mode=all
-	// re-serves the widget summaries verbatim from dispatch time, so a
-	// post-dispatch lens_diagnostic_mark (suppress/defer) would otherwise still
-	// show here. Re-apply the weak filter (zero I/O) for the cache-only path and
-	// re-summarize so blocking/error/warning counts reflect the drop.
-	// Same project rule policy (`.pi-lens.json` `rules.<id>.disable`/`select`)
-	// overlays both modes: mode=full re-applies it after inline suppression /
-	// disposition (zero I/O), mode=all applies it here on the cache-only path.
-	// The full path's policyMover is loaded below in `applyInlineSuppressionsToSummaries`.
+	// Cached summaries predate marks. Read current content so strict
+	// false-positive anchors apply immediately; keep the zero-I/O weak fallback
+	// for a file that disappeared after reconciliation.
 	const policyMap = loadProjectRulePolicyMap(cwd);
 	const dispositioned = isFullMode
 		? summaries
 		: summaries.map((s) => {
-				const kept = applyWeakDispositions(
-					s.diagnostics ?? [],
-					cwd,
-					s.filePath,
-				);
+				const diagnostics = s.diagnostics ?? [];
+				let content: string | undefined;
+				try {
+					content = fsSync.readFileSync(s.filePath, "utf-8");
+				} catch {}
+				const kept = content === undefined
+					? applyWeakDispositions(diagnostics, cwd, s.filePath)
+					: applyDispositions(diagnostics, cwd, s.filePath, content);
 				const policyKept = applyRulePolicy(kept, policyMap);
 				if (
 					policyKept.length === kept.length &&
-					kept.length === (s.diagnostics?.length ?? 0)
+					kept.length === diagnostics.length
 				)
 					return s;
 				return summarizeDiagnostics(s.filePath, policyKept, s.hasFinalSnapshot);

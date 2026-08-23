@@ -3326,6 +3326,29 @@ describe("lens_diagnostics disposition read-filter (#755)", () => {
 		expect(after.details).toMatchObject({ mode: "all" });
 	});
 
+	it("mode=all immediately hides a strict false-positive", async () => {
+		const filePath = path.join(ddTmp, "false-positive.ts");
+		fs.writeFileSync(filePath, "const target = bad();\n");
+		mockSummaries.push(
+			sum(filePath, { blocking: 1, errors: 1 }, {
+				diagnostics: [{
+					severity: "error",
+					semantic: "blocking",
+					message: "bad call",
+					line: 1,
+					rule: "no-bad",
+					tool: "opengrep",
+				}],
+			}),
+		);
+		expect(String((await run(makeTool(), { mode: "all" }, ddTmp)).content[0].text)).toContain("bad call");
+		await runMark({
+			filePath, line: 1, message: "bad call", rule: "no-bad",
+			tool: "opengrep", disposition: "false-positive",
+		});
+		expect(String((await run(makeTool(), { mode: "all" }, ddTmp)).content[0].text)).not.toContain("bad call");
+	});
+
 	it("mode=full filtering is unaffected — its own content-based pass still runs", async () => {
 		// A defer mark also drops in mode=full (applyDispositions there), so the
 		// cache-only weak filter added for delta/all doesn't regress full.

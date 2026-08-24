@@ -17,9 +17,12 @@ import {
 	anchorsForDiagnostic,
 	applyDispositions,
 	applyWeakDispositions,
+	hasAnyDispositionMarks,
+	hasStrictDispositionMarks,
 	getDisposition,
 	type DispositionCandidate,
 } from "../clients/diagnostic-dispositions.js";
+import { freshnessFromMtime } from "../clients/freshness.js";
 import { applyInlineSuppressions } from "../clients/dispatch/inline-suppressions.js";
 import { gateFindingsByPathFreshness } from "../clients/advisory-provenance.js";
 import { normalizeRuleId } from "../clients/dispatch/rule-id-normalize.js";
@@ -33,6 +36,7 @@ import { combineAbortSignals } from "../clients/deadline-utils.js";
 import { getProjectIgnoreMatcher } from "../clients/file-utils.js";
 import {
 	isAtOrAboveHomeDir,
+	normalizeEphemeralMapKey,
 	normalizeFilePath,
 } from "../clients/path-utils.js";
 import { getLSPService } from "../clients/lsp/index.js";
@@ -599,11 +603,119 @@ function appendProjectDiagnosticsDeltaLines(
 }
 
 /**
+ * Bounded content memo for {@link applyCachedDispositions}' strict-immediate
+ * path: one read per (file revision), not per query. Keyed through
+ * `normalizeEphemeralMapKey` (cheap slash-fold + win32-lowercase — these keys
+ * are produced and consumed inside this process only) and validated against a
+ * fresh stat's mtimeMs+size on every hit, so an edit invalidates without a
+ * TTL. Insertion-ordered LRU cap bounds resident source bytes; repeated
+ * queries and multi-file reports that cite the same file reuse one read.
+ */
+const CACHED_CONTENT_MEMO_CAP = 64;
+const cachedContentMemo = new Map<
+	string,
+	{ mtimeMs: number; size: number; content: string }
+>();
+
+function readContentForAnchors(
+	filePath: string,
+	stat: fsSync.Stats,
+): string | undefined {
+	const key = normalizeEphemeralMapKey(filePath);
+	const hit = cachedContentMemo.get(key);
+	if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
+		// Refresh LRU position.
+		cachedContentMemo.delete(key);
+		cachedContentMemo.set(key, hit);
+		return hit.content;
+	}
+	let content: string;
+	try {
+		content = fsSync.readFileSync(filePath, "utf-8");
+	} catch {
+		return undefined;
+	}
+	if (cachedContentMemo.size >= CACHED_CONTENT_MEMO_CAP) {
+		const oldest = cachedContentMemo.keys().next().value;
+		if (oldest !== undefined) cachedContentMemo.delete(oldest);
+	}
+	cachedContentMemo.set(key, {
+		mtimeMs: stat.mtimeMs,
+		size: stat.size,
+		content,
+	});
+	return content;
+}
+
+/**
+ * ONE disposition seam for every cache-only lens_diagnostics surface —
+ * mode=all summaries, mode=delta's actionable/quality warnings, the delta
+ * project-diagnostics report, and the empty-delta carried-over note. Cached
+ * findings predate any lens_diagnostic_mark, so each surface must re-apply
+ * dispositions at query time; before this seam each site hand-picked its own
+ * variant and three of them served stale STRICT false-positive marks via the
+ * weak-only filter (a weak filter can never drop a strict-anchored mark, nor
+ * any blocking finding — #1625 F1).
+ *
+ * Strict-immediate path: stat the file once, then compare its mtime against
+ * the newest cached diagnostic's own observation stamp through the freshness
+ * kernel (`freshnessFromMtime`). Fresh or stamp-less means the current bytes
+ * still describe what these findings were observed against, so the content is
+ * read (memoized per revision above) and the FULL applyDispositions filter
+ * runs — a fresh false-positive mark converges immediately, including on
+ * blocking findings.
+ *
+ * Weak fallback (zero further I/O): a file that is gone/unreadable, or whose
+ * mtime moved AFTER these diagnostics were observed. Stale-content edge: the
+ * cached findings describe a superseded revision, so their line numbers may no
+ * longer align with the lines a mark hashed; deriving strict anchors from the
+ * new content could match a DIFFERENT occurrence that merely shares the line
+ * number and identical text, so the mark waits for the next real dispatch to
+ * re-derive both sides against matching revisions. Weak suppress/defer marks
+ * are intent-level and never look at content, so they keep applying here.
+ */
+function applyCachedDispositions<
+	T extends DispositionCandidate & { observedAt?: number },
+>(cachedDiagnostics: T[], cwd: string, filePath: string): T[] {
+	// Zero-I/O fast paths (#1625 F2 precedent): with no marks at all there is
+	// nothing to filter; with only weak suppress/defer marks a strict anchor
+	// can never match, so the weak filter serves them without any stat/read.
+	if (!hasAnyDispositionMarks(cwd)) return cachedDiagnostics;
+	if (!hasStrictDispositionMarks(cwd)) {
+		return applyWeakDispositions(cachedDiagnostics, cwd, filePath);
+	}
+	let stat: fsSync.Stats;
+	try {
+		stat = fsSync.statSync(filePath);
+	} catch {
+		return applyWeakDispositions(cachedDiagnostics, cwd, filePath);
+	}
+	const referenceMs = cachedDiagnostics.reduce<number>(
+		(latest, d) => Math.max(latest, d.observedAt ?? 0),
+		0,
+	);
+	if (
+		referenceMs > 0 &&
+		freshnessFromMtime({ mtimeMs: stat.mtimeMs, referenceMs }).verdict ===
+			"stale"
+	) {
+		return applyWeakDispositions(cachedDiagnostics, cwd, filePath);
+	}
+	const content = readContentForAnchors(filePath, stat);
+	if (content === undefined) {
+		return applyWeakDispositions(cachedDiagnostics, cwd, filePath);
+	}
+	return applyDispositions(cachedDiagnostics, cwd, filePath, content);
+}
+
+/**
  * #755: drop project-diagnostics-delta findings disposed suppress/defer before
  * delta mode re-serves them. Anchored via `projectDiagnosticToWidget` so the
  * (tool, rule) an agent's mark binds to matches mode=full's own project-runner
  * filter (`applyInlineSuppressionsToSummaries`), keeping the two paths in
- * agreement. Weak-anchored → no file read. Also applies the project's
+ * agreement. Goes through the shared {@link applyCachedDispositions} seam so
+ * strict false-positive anchors apply immediately, like every other cache-only
+ * surface. Also applies the project's
  * `.pi-lens.json` `rules.<id>.disable`/`select` policy so a project's policy
  * overlays the same delta report cache; the cache is otherwise insensitive to
  * a project-config edit (the per-edit path picks it up immediately, but a
@@ -617,7 +729,7 @@ function filterDeltaReportDispositions(
 	if (!report?.diagnostics.length) return report;
 	const kept = report.diagnostics.filter(
 		(d) =>
-			applyWeakDispositions(
+			applyCachedDispositions(
 				[projectDiagnosticToWidget(d, d.filePath)],
 				cwd,
 				d.filePath,
@@ -728,10 +840,12 @@ function formatDeltaMode(
 		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
 	// #755: delta re-serves the actionable/quality caches verbatim, but those
 	// were filtered at DISPATCH time — before any lens_diagnostic_mark. Re-apply
-	// the weak disposition filter (suppress/defer) here so a mark converges
-	// immediately, not only on the next edit. Weak-anchored → zero file I/O, so
-	// this stays "instant" (see applyWeakDispositions).
-	const visibleWarningFiles = <W extends DispositionCandidate>(
+	// dispositions here so a mark converges immediately, not only on the next
+	// edit — through the shared {@link applyCachedDispositions} seam, so strict
+	// false-positive marks land as fast as suppress/defer.
+	const visibleWarningFiles = <
+		W extends DispositionCandidate & { observedAt?: number },
+	>(
 		files: Array<{ filePath: string; warnings?: W[] }> | undefined,
 	) =>
 		(files ?? [])
@@ -739,7 +853,7 @@ function formatDeltaMode(
 			.map((file) => ({
 				filePath: file.filePath,
 				warnings: applyRulePolicy(
-					applyWeakDispositions(file.warnings ?? [], cwd, file.filePath),
+					applyCachedDispositions(file.warnings ?? [], cwd, file.filePath),
 					policyMap,
 				),
 			}))
@@ -808,7 +922,7 @@ function formatDeltaMode(
 			.map((f) => ({
 				...f,
 				diagnostics: applyRulePolicy(
-					applyWeakDispositions(f.diagnostics, cwd, f.filePath),
+					applyCachedDispositions(f.diagnostics, cwd, f.filePath),
 					policyMap,
 				),
 			}))
@@ -2286,21 +2400,16 @@ function formatAllMode(
 	const ignoreFile = createCurrentIgnoreFilter(cwd);
 	const includeFile = (filePath: string) =>
 		ignoreFile(filePath) && (!pathsScope || pathsScope.includeFile(filePath));
-	// Cached summaries predate marks. Read current content so strict
-	// false-positive anchors apply immediately; keep the zero-I/O weak fallback
-	// for a file that disappeared after reconciliation.
+	// Cached summaries predate marks. Every cache-only surface re-applies
+	// dispositions through the shared applyCachedDispositions seam — strict
+	// false-positive anchors against current content when the file is
+	// unchanged since observation, weak-only fallback otherwise.
 	const policyMap = loadProjectRulePolicyMap(cwd);
 	const dispositioned = isFullMode
 		? summaries
 		: summaries.map((s) => {
 				const diagnostics = s.diagnostics ?? [];
-				let content: string | undefined;
-				try {
-					content = fsSync.readFileSync(s.filePath, "utf-8");
-				} catch {}
-				const kept = content === undefined
-					? applyWeakDispositions(diagnostics, cwd, s.filePath)
-					: applyDispositions(diagnostics, cwd, s.filePath, content);
+				const kept = applyCachedDispositions(diagnostics, cwd, s.filePath);
 				const policyKept = applyRulePolicy(kept, policyMap);
 				if (
 					policyKept.length === kept.length &&

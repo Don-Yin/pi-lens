@@ -286,6 +286,35 @@ export function _setDispositionStatForTests(
 	dispositionStatSync = statSync ?? fs.statSync;
 }
 
+/**
+ * Zero-I/O guard for cache-only callers (lens_diagnostics delta/all): true
+ * when ANY disposition mark or session defer exists, so a caller can skip its
+ * whole strict/weak filter — including every file stat/read the strict branch
+ * would need — in the overwhelmingly common no-marks case. Same hoist shape as
+ * applyDispositionsMultiFile's #1625 F2 empty-store early return; `readState`
+ * is mtime+size stat-cached, so repeated calls cost one stat.
+ */
+export function hasAnyDispositionMarks(cwd: string): boolean {
+	return Boolean(readState(cwd).dispositions) || deferredThisSession.size > 0;
+}
+
+/**
+ * True when the project's disposition store holds at least one STRICT-anchored
+ * `false-positive` mark — the only disposition kind whose immediate application
+ * needs file content. A store with only weak suppress/defer marks can never
+ * produce a strict-anchor match, so cache-only callers can serve them through
+ * the zero-I/O weak filter and skip every stat/read the strict path would
+ * charge.
+ */
+export function hasStrictDispositionMarks(cwd: string): boolean {
+	const dispositions = readState(cwd).dispositions;
+	if (!dispositions) return false;
+	for (const key of Object.keys(dispositions)) {
+		if (dispositions[key]?.disposition === "false-positive") return true;
+	}
+	return false;
+}
+
 // Test seam for `applyDispositionsMultiFile`'s per-group content read (#1625
 // F2) — Vitest can't `vi.spyOn` a bare ESM `node:fs` named export directly
 // ("Module namespace is not configurable in ESM"), so the F2 regression test

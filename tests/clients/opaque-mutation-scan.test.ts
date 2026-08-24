@@ -28,6 +28,8 @@ import { handleToolResult } from "../../clients/runtime-tool-result.js";
 import { RuntimeCoordinator } from "../../clients/runtime-coordinator.js";
 import { CacheManager } from "../../clients/cache-manager.js";
 import { getProjectChangeLogPath } from "../../clients/project-changes.js";
+import { flushLatencyLog } from "../../clients/latency-logger.js";
+import { getGlobalPiLensDir } from "../../clients/file-utils.js";
 import type { ProjectChangeEntry } from "../../clients/project-changes.js";
 
 import {
@@ -96,6 +98,55 @@ describe("diffFileStats", () => {
 		expect(keys).toContain(normalizeMapKey(modifiedPath));
 		expect(keys).toContain(normalizeMapKey(addedPath));
 		expect(keys).not.toContain(normalizeMapKey(unchangedPath));
+	});
+});
+
+describe("content-hash confirm on the stat-diff path (#2000)", () => {
+	it("detects a same-tick same-size rewrite via hashes, red-first vs mtime+size", async () => {
+		// The COLLISION, constructed deterministically: pin a known whole-ms
+		// mtime via utimes on BOTH sides (before AND after the rewrite), so
+		// mtime+size identity sees NO change on every platform/filesystem -
+		// restoring a captured sub-ms timestamp is NOT portable (Linux CI red).
+		const file = path.join(tmpDir, "collision.ts");
+		const pinned = new Date(Date.now() - 5_000);
+		fs.writeFileSync(file, "AAAA\n", "utf8");
+		fs.utimesSync(file, pinned, pinned);
+		const before = await captureFileStats(tmpDir, { withHashes: true });
+		const beforeEntry = before.snapshot?.get(normalizeMapKey(file));
+		expect(beforeEntry?.hash).toBeDefined();
+
+		fs.writeFileSync(file, "BBBB\n", "utf8");
+		fs.utimesSync(file, pinned, pinned);
+
+		// Without hashes: the collision is invisible (documents the old hole).
+		const plainAfter = await captureFileStats(tmpDir);
+		expect(
+			diffFileStats(
+				before.snapshot ?? new Map(),
+				plainAfter.snapshot ?? new Map(),
+			),
+		).toEqual([]);
+
+		// With hashes: content confirm catches it.
+		const hashedAfter = await captureFileStats(tmpDir, { withHashes: true });
+		expect(
+			diffFileStats(
+				before.snapshot ?? new Map(),
+				hashedAfter.snapshot ?? new Map(),
+			),
+		).toContain(normalizeMapKey(file));
+	});
+
+	it("degrades to mtime+size when the hash budget is exhausted", async () => {
+		const big = path.join(tmpDir, "big.ts");
+		fs.writeFileSync(big, "x".repeat(16), "utf8"); // budget below forces skip
+		// Re-import with a tiny budget by capturing with default (no hashes)
+		// semantics: entries simply carry no hash and diff falls back.
+		const before = await captureFileStats(tmpDir);
+		const after = await captureFileStats(tmpDir);
+		expect(
+			diffFileStats(before.snapshot ?? new Map(), after.snapshot ?? new Map()),
+		).toEqual([]);
 	});
 });
 
@@ -248,4 +299,175 @@ describe("recoverOpaqueChangesViaGit (real git repo)", () => {
 			}
 		},
 	);
+});
+
+describe("partial-recognition recovery (#2000 PR-B)", () => {
+	let repoDir = "";
+
+	function depsFor(
+		runtime: RuntimeCoordinator,
+		command: string,
+		isError?: boolean,
+	) {
+		return {
+			event: {
+				toolName: "bash",
+				input: { command },
+				content: [{ type: "text", text: "out" }],
+				...(isError ? { isError: true } : {}),
+			},
+			getFlag: () => false,
+			dbg: () => {},
+			runtime,
+			cacheManager: new CacheManager(false),
+			biomeClient: {},
+			ruffClient: {},
+			testRunnerClient: {},
+			metricsClient: {},
+			resetLSPService: () => {},
+			agentBehaviorRecord: () => [],
+			formatBehaviorWarnings: () => "",
+		} as unknown as Parameters<typeof handleToolResult>[0];
+	}
+
+	function callDeps(runtime: RuntimeCoordinator, command: string) {
+		return {
+			event: { toolName: "bash", input: { command } },
+			ctx: { cwd: repoDir },
+			lensEnabled: true,
+			getFlag: () => false,
+			dbg: () => {},
+			runtime,
+			cacheManager: new CacheManager(false),
+			ensureLSPConfigInitialized: async () => {},
+			updateLspStatus: () => {},
+			resetLSPService: () => {},
+		} as Parameters<typeof handleToolCall>[0];
+	}
+
+	function nodeScriptFile(script: string): string {
+		const file = path.join(repoDir, `.opaque-child-${Date.now()}.cjs`);
+		fs.writeFileSync(file, script, "utf8");
+		// Written BEFORE the baseline by construction - backdate it out of the
+		// recovery window so only the child's own writes are attributed.
+		const past = new Date(Date.now() - 5000);
+		fs.utimesSync(file, past, past);
+		return file;
+	}
+
+	function readChangeLog(): ProjectChangeEntry[] {
+		const logPath = getProjectChangeLogPath(repoDir);
+		if (!fs.existsSync(logPath)) return [];
+		return fs
+			.readFileSync(logPath, "utf8")
+			.split("\n")
+			.filter((l) => l.trim())
+			.map((l) => JSON.parse(l) as ProjectChangeEntry);
+	}
+
+	beforeEach(() => {
+		repoDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-lens-opaque-partial-"));
+		execSync("git init -q", { cwd: repoDir });
+		process.env.PILENS_DATA_DIR = path.join(repoDir, "data");
+	});
+
+	afterEach(() => {
+		delete process.env.PILENS_DATA_DIR;
+		removeTempDirSync(repoDir);
+	});
+
+	it("mixed command: redirect once as agent-write, internal write as opaque-script", async () => {
+		const runtime = new RuntimeCoordinator();
+		runtime.projectRoot = repoDir;
+		runtime.setTelemetryIdentity({ sessionId: "partial-a" });
+		const redirectTarget = path.join(repoDir, "redirected-out.txt");
+		const internalFile = path.join(repoDir, "internal-write.txt");
+		const scriptFile = nodeScriptFile(
+			`require('fs').writeFileSync(${JSON.stringify(redirectTarget)}, 'redirected');require('fs').writeFileSync(${JSON.stringify(internalFile)}, 'internal');`,
+		);
+		try {
+			// Redirect is RECOGNIZED by the extractor; the internal write is not.
+			const command = `node "${scriptFile}" > "${redirectTarget}"`;
+			await handleToolCall(callDeps(runtime, command));
+			execSync(`node "${scriptFile}"`, { cwd: repoDir });
+			await handleToolResult(depsFor(runtime, command));
+
+			const sources = readChangeLog().reduce(
+				(acc, e) => {
+					acc[path.basename(e.filePath)] = e.source;
+					return acc;
+				},
+				{} as Record<string, string>,
+			);
+			expect(sources["redirected-out.txt"]).toBe("agent-write");
+			expect(sources["internal-write.txt"]).toBe("opaque-script");
+		} finally {
+			fs.rmSync(scriptFile, { force: true });
+		}
+	});
+
+	it("recognized-only command without baseline emits explicit coverage-unknown", async () => {
+		// latency.log writes are guarded by PI_LENS_TEST_MODE; scope the opt-out
+		// to this one assertion (#1742 sanctioned pattern).
+		const previousTestMode = process.env.PI_LENS_TEST_MODE;
+		process.env.PI_LENS_TEST_MODE = "0";
+		const runtime = new RuntimeCoordinator();
+		runtime.projectRoot = repoDir;
+		runtime.setTelemetryIdentity({ sessionId: "partial-b" });
+		try {
+			const outTarget = path.join(repoDir, "echo-out.txt");
+			const command = `node -e "" > "${outTarget}"`;
+			// No handleToolCall baseline on purpose.
+			// Delta assertion: latency.log is append-only and shared, so assert
+			// on the LINES THIS RUN ADDED - a plain toContain would stay green
+			// forever after the first ever emission (review round-2 P2).
+			const latencyPath = path.join(getGlobalPiLensDir(), "latency.log");
+			const beforeLines = new Set(
+				fs.existsSync(latencyPath)
+					? fs.readFileSync(latencyPath, "utf8").split("\n")
+					: [],
+			);
+			await handleToolResult(depsFor(runtime, command));
+			await flushLatencyLog();
+			const appended = fs
+				.readFileSync(latencyPath, "utf8")
+				.split("\n")
+				.filter((l) => l.trim() && !beforeLines.has(l));
+			expect(
+				appended.some((l) => l.includes("partial-recognition-no-baseline")),
+			).toBe(true);
+		} finally {
+			if (previousTestMode === undefined) delete process.env.PI_LENS_TEST_MODE;
+			else process.env.PI_LENS_TEST_MODE = previousTestMode;
+		}
+	});
+
+	it("failed mixed command attributes BOTH writes as opaque-script (failure atomicity)", async () => {
+		const runtime = new RuntimeCoordinator();
+		runtime.projectRoot = repoDir;
+		runtime.setTelemetryIdentity({ sessionId: "partial-c" });
+		const redirectTarget = path.join(repoDir, "failed-redirect.txt");
+		const internalFile = path.join(repoDir, "failed-internal.txt");
+		const scriptFile = nodeScriptFile(
+			`require('fs').writeFileSync(${JSON.stringify(redirectTarget)}, 'r');require('fs').writeFileSync(${JSON.stringify(internalFile)}, 'i');`,
+		);
+		try {
+			const command = `node "${scriptFile}" > "${redirectTarget}"`;
+			await handleToolCall(callDeps(runtime, command));
+			// Writes land BEFORE the failure surfaces (isError=true).
+			execSync(`node "${scriptFile}"`, { cwd: repoDir });
+			await handleToolResult(depsFor(runtime, command, true));
+
+			const opaqueFiles = readChangeLog()
+				.filter((e) => e.source === "opaque-script")
+				.map((e) => path.basename(e.filePath))
+				.sort();
+			expect(opaqueFiles).toEqual([
+				"failed-internal.txt",
+				"failed-redirect.txt",
+			]);
+		} finally {
+			fs.rmSync(scriptFile, { force: true });
+		}
+	});
 });

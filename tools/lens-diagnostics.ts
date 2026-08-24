@@ -1441,17 +1441,34 @@ function tallyLspPrimaryVsAuxiliary(results: WorkspaceLspDiagnosticResult[]): {
 	return { primary, auxiliary };
 }
 
-function mergeDiagnosticsWithWidgetSummaries(
+export function mergeDiagnosticsWithWidgetSummaries(
 	widgetSummaries: FileDiagnosticSummary[],
 	lspResults: WorkspaceLspDiagnosticResult[],
 	projectSnapshot?: ProjectDiagnosticsSnapshot,
 	projectDelta?: ProjectDiagnosticsDeltaReport,
+	/**
+	 * #1993: resolved paths covered by a CONFIRMED, fully-covered LSP result
+	 * in `lspResults`. The fresh sweep is AUTHORITATIVE for these files - any
+	 * widget-store diagnostics seeded for them predate the sweep and must not
+	 * survive it (an additive-only merge let mid-edit stale 🔴 entries render
+	 * forever beside a clean sweep). Files absent from this set keep today's
+	 * additive behavior (fail-open: unconfirmed/timed-out sweeps never retire
+	 * widget state they did not actually re-check).
+	 */
+	authoritativeLspFiles?: ReadonlySet<string>,
 ): FileDiagnosticSummary[] {
 	const byFile = new Map<string, FileDiagnosticSummary>();
 	const seen = new Set<string>();
 
 	for (const summary of widgetSummaries) {
 		const filePath = path.resolve(summary.filePath);
+		// NOTE (#1993 review): dispositions recorded against a CACHED copy's
+		// message text may not match this file's fresh sweep copy (weak
+		// anchors key on message). Both copies derive from the same LSP
+		// diagnostic via convertLspDiagnostics, so identity is stable in
+		// practice; inline pi-lens-ignore comments are the primary
+		// suppression mechanism.
+		if (authoritativeLspFiles?.has(filePath)) continue;
 		const diagnostics = (summary.diagnostics ?? []).map((d) => ({ ...d }));
 		byFile.set(filePath, { ...summary, filePath, diagnostics });
 		for (const diagnostic of diagnostics) {
@@ -1909,6 +1926,29 @@ async function formatFullMode(
 	// read as "0 issues, clean" via its LSP contribution. It can still
 	// legitimately show diagnostics from widgetSummaries/project-runner state
 	// below if those independently have entries for it.
+	// #1993: files with a CONFIRMED, fully-covered LSP result are authoritative
+	// - the fresh sweep replaces their widget-store state instead of merging
+	// additively beside it.
+	const authoritativeLspFiles = new Set(
+		fullyCoveredLspResults.map((result) => path.resolve(result.filePath)),
+	);
+	// #1993 review: retirement must be observable - if a future regression
+	// makes the set falsely authoritative, findings would vanish silently.
+	const authoritativeRetiredCount = getFileDiagnosticSummaries().filter(
+		(summary) =>
+			includeFile(summary.filePath) &&
+			authoritativeLspFiles.has(path.resolve(summary.filePath)) &&
+			(summary.diagnostics?.length ?? 0) > 0,
+	).length;
+	if (authoritativeRetiredCount > 0) {
+		logLatency({
+			type: "phase",
+			phase: "lsp_authoritative_widget_retire",
+			filePath: "",
+			durationMs: 0,
+			metadata: { files: authoritativeRetiredCount },
+		});
+	}
 	const summaries = await applyInlineSuppressionsToSummaries(
 		mergeDiagnosticsWithWidgetSummaries(
 			getFileDiagnosticSummaries().filter((summary) =>
@@ -1917,6 +1957,7 @@ async function formatFullMode(
 			confirmedLspResults,
 			projectSnapshot,
 			projectDelta,
+			authoritativeLspFiles,
 		),
 		cwd,
 		policyMap,

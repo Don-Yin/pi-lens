@@ -550,6 +550,19 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 	) {
 		const command = (event.input as { command: string }).command;
 		const recognized = extractWrittenPathsFromCommand(command, workspaceRoot);
+		// The SURVIVING recognized set: what will actually dispatch. Failure
+		// atomicity (#2000 invariant 5) means opaque recovery must subtract
+		// THIS set, not raw recognized - otherwise a redirect target dropped
+		// by the isError filter would be subtracted from recovery AND
+		// excluded here, attributed nowhere.
+		const recognizedWritten =
+			event.isError !== true
+				? recognized.filter(
+						(wp) =>
+							!isExternalOrVendorFile(wp, workspaceRoot) &&
+							!isPathIgnoredByProject(wp, workspaceRoot, false),
+					)
+				: [];
 		// #2000 phase 2: when the extractor recognizes NOTHING, the command is
 		// opaque-candidate — recover its actual changed set by diffing the pre
 		// snapshot taken at tool_call. Partial writes that landed before a
@@ -557,14 +570,24 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 		// them) — a deliberate divergence from the isError filter above, which
 		// exists for restore semantics where attribution would lie.
 		let opaquePaths: string[] = [];
-		if (recognized.length === 0 && workspaceRoot && !getFlag("no-read-guard")) {
+		// Recovery runs for EVERY bash command with a pending baseline - not
+		// only recognized-empty ones. A mixed command (`python x.py > out.ts`
+		// plus script-internal writes) previously skipped observation entirely
+		// with zero telemetry; git-first recovery is cheap enough (~60ms) to
+		// close that gap, subtracting already-recognized paths so nothing
+		// double-dispatches.
+		if (workspaceRoot && !getFlag("no-read-guard")) {
 			const scanRoot = workspaceRoot;
 			const started = Date.now();
 			const pending = getOpaqueBaselineStore().take(
 				`${normalizeMapKey(path.resolve(scanRoot))}:${runtime.sessionGeneration}`,
 			);
 			let unknownReason: string | undefined;
-			if (!pending) {
+			if (!pending && recognized.length > 0) {
+				// Partial coverage without observation: the explicit verdict
+				// invariant 1 demands (never silently imply no change).
+				unknownReason = "partial-recognition-no-baseline";
+			} else if (!pending) {
 				unknownReason = "no-pending-snapshot";
 			} else if (pending.strategy === "git") {
 				// Git-first: no universe cap - works on any repo size.
@@ -578,11 +601,15 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 							!isExternalOrVendorFile(p, scanRoot) &&
 							!isPathIgnoredByProject(p, scanRoot, false),
 					);
-				} else {
+				} else if (recovery.verdict === "unknown" && recognized.length > 0) {
+					// Git hiccup on a partially-recognized command: the
+					// remainder's coverage is unknown, never clean-by-default.
 					unknownReason = recovery.unknownReason;
 				}
 			} else if (pending.stats) {
-				const outcome = await captureFileStats(scanRoot);
+				const outcome = await captureFileStats(scanRoot, {
+					withHashes: true,
+				});
 				if (outcome.snapshot && !outcome.unknownReason) {
 					opaquePaths = diffFileStats(pending.stats, outcome.snapshot);
 				} else {
@@ -593,6 +620,12 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 				}
 			} else {
 				unknownReason = pending.statsUnknownReason ?? "walk-failed";
+			}
+			if (opaquePaths.length > 0 && recognizedWritten.length > 0) {
+				const survivingKeys = new Set(
+					recognizedWritten.map((p) => normalizeMapKey(path.resolve(p))),
+				);
+				opaquePaths = opaquePaths.filter((p) => !survivingKeys.has(p));
 			}
 			if (unknownReason) {
 				logLatency({
@@ -616,15 +649,7 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 		// wp iterates opaquePaths VERBATIM (already normalizeMapKey keys), so the
 		// set must hold those exact strings - no re-resolution.
 		const opaqueSet = new Set(opaquePaths);
-		const written = [
-			...recognized.filter(
-				(wp) =>
-					event.isError !== true &&
-					!isExternalOrVendorFile(wp, workspaceRoot) &&
-					!isPathIgnoredByProject(wp, workspaceRoot, false),
-			),
-			...opaquePaths,
-		];
+		const written = [...recognizedWritten, ...opaquePaths];
 		for (const wp of written) {
 			if (!getFlag("no-read-guard")) deps.readGuard?.recordWritten(wp);
 			const receipt = (runtime as Partial<RuntimeCoordinator>)
@@ -635,9 +660,20 @@ export async function handleToolResult(deps: ToolResultDeps): Promise<{
 			// Recovered opaque writes carry their own source so the change log
 			// distinguishes them from parsed writes (auditable in production).
 			const isOpaque = opaqueSet.has(wp);
+			// Failure atomicity: an opaque-recovered file VERIFIABLY exists on
+			// disk, so its synthetic event must not inherit isError - the main
+			// path early-returns on failed host results before attribution,
+			// which would silently drop exactly the partial writes invariant 5
+			// says to attribute.
+			const syntheticEvent = {
+				...event,
+				toolName: "write",
+				input: { path: wp },
+				isError: false,
+			};
 			const syntheticResult = await handleToolResult({
 				...deps,
-				event: { ...event, toolName: "write", input: { path: wp } },
+				event: syntheticEvent,
 				_bypassDebounce: true,
 				_autofixMode: autofixMode,
 				_attachmentBudget: syntheticAttachmentBudget,

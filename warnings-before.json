@@ -1,0 +1,91 @@
+{
+  "mode": "before",
+  "version": "4.4.4",
+  "rows": [
+    {
+      "key": "rules",
+      "input": {
+        "rules": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"rules\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "maxProjectFiles",
+      "input": {
+        "maxProjectFiles": 17
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"maxProjectFiles\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "reviewGraph",
+      "input": {
+        "reviewGraph": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"reviewGraph\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "trivy",
+      "input": {
+        "trivy": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"trivy\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "helm",
+      "input": {
+        "helm": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"helm\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "lps",
+      "input": {
+        "lps": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"lps\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "tools",
+      "input": {
+        "tools": {
+          "ast_grep_search": {
+            "enabled": false
+          }
+        }
+      },
+      "warning": "Accepted",
+      "messages": [],
+      "returned": {
+        "tools": {
+          "ast_grep_search": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "mode": "after",
+  "version": "4.4.4",
+  "rows": [
+    {
+      "key": "rules",
+      "input": {
+        "rules": {}
+      },
+      "warning": "Project scope",
+      "messages": [
+        "\"rules\" is a project-scoped pi-lens setting; set it in <project>/.pi-lens.json, not in the global config; ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "maxProjectFiles",
+      "input": {
+        "maxProjectFiles": 17
+      },
+      "warning": "Project scope",
+      "messages": [
+        "\"maxProjectFiles\" is a project-scoped pi-lens setting; set it in <project>/.pi-lens.json, not in the global config; ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "reviewGraph",
+      "input": {
+        "reviewGraph": {}
+      },
+      "warning": "Project scope",
+      "messages": [
+        "\"reviewGraph\" is a project-scoped pi-lens setting; set it in <project>/.pi-lens.json, not in the global config; ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "trivy",
+      "input": {
+        "trivy": {}
+      },
+      "warning": "Project scope",
+      "messages": [
+        "\"trivy\" is a project-scoped pi-lens setting; set it in <project>/.pi-lens.json, not in the global config; ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "helm",
+      "input": {
+        "helm": {}
+      },
+      "warning": "Project scope",
+      "messages": [
+        "\"helm\" is a project-scoped pi-lens setting; set it in <project>/.pi-lens.json, not in the global config; ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "lps",
+      "input": {
+        "lps": {}
+      },
+      "warning": "Typo",
+      "messages": [
+        "unknown key \"lps\" is not a recognized pi-lens setting (check for a typo); ignored [PILENS_CFG_0001]"
+      ],
+      "returned": {}
+    },
+    {
+      "key": "tools",
+      "input": {
+        "tools": {
+          "ast_grep_search": {
+            "enabled": false
+          }
+        }
+      },
+      "warning": "Accepted",
+      "messages": [],
+      "returned": {
+        "tools": {
+          "ast_grep_search": {
+            "enabled": false
+          }
+        }
+      }
+    }
+  ]
+}

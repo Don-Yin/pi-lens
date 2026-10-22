@@ -1,0 +1,175 @@
+{
+  "issue": "#4617",
+  "baseSha": "7ab20575cbeeee8e960d47f7b072400bba25271d",
+  "scenario": "Existing files; no classified writes after beginTurn; confirmed-clean retirement; handleTurnEnd and consumeTurnEndFindings",
+  "observations": [
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 0,
+      "elapsedMs": 16.650291999999922,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 1,
+      "elapsedMs": 5.828125,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 2,
+      "elapsedMs": 4.981959000000074,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 3,
+      "elapsedMs": 4.923208000000045,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 4,
+      "elapsedMs": 6.361916000000065,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 1,
+      "repeat": 5,
+      "elapsedMs": 5.622082999999975,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 0,
+      "elapsedMs": 6.540208000000007,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 1,
+      "elapsedMs": 5.645165999999904,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 2,
+      "elapsedMs": 7.12804200000005,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 3,
+      "elapsedMs": 11.331291999999962,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 4,
+      "elapsedMs": 10.440625000000068,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "before",
+      "fileCount": 10,
+      "repeat": 5,
+      "elapsedMs": 13.559750000000008,
+      "text": "[pi-lens automated check — not a user request] Historical finding; workspace changed since capture; re-run to confirm. (session unknown / turn unknown / generation unknown)\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 0,
+      "elapsedMs": 11.573499999999967,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 1,
+      "elapsedMs": 5.086041000000023,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 2,
+      "elapsedMs": 3.7426670000000968,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 3,
+      "elapsedMs": 3.9400829999999587,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 4,
+      "elapsedMs": 3.634584000000018,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 1,
+      "repeat": 5,
+      "elapsedMs": 4.240750000000048,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 0,
+      "elapsedMs": 6.101374999999962,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 1,
+      "elapsedMs": 6.0346250000000055,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 2,
+      "elapsedMs": 4.82000000000005,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 3,
+      "elapsedMs": 4.633458000000019,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 4,
+      "elapsedMs": 4.291666999999961,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    },
+    {
+      "condition": "after",
+      "fileCount": 10,
+      "repeat": 5,
+      "elapsedMs": 3.6229170000000295,
+      "text": "[pi-lens automated check — not a user request] Address 🔴 blockers before continuing; ℹ️ advisories are informational only.\n\nResolved this turn: src/value-0.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-1.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-2.ts (1 blocker(s) confirmed clean)\nResolved this turn: src/value-3.ts (1 blocker(s) confirmed clean)"
+    }
+  ]
+}

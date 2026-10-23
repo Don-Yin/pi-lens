@@ -1,0 +1,466 @@
+{
+  "description": "Three PHP files in one Git project without composer.json; built PHPServer.root outputs, not spawned process counts.",
+  "relativeFiles": [
+    "plugins/gobcore/includes/a.php",
+    "plugins/gobcore/main.php",
+    "themes/gobportal/parts/b.php"
+  ],
+  "phpRoots": [
+    "plugins/gobcore/includes",
+    "plugins/gobcore",
+    "themes/gobportal/parts"
+  ],
+  "distinctPhpRoots": 3,
+  "registry": [
+    {
+      "id": "typescript",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "deno",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "python",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "python-jedi",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "go",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "rust",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "ruby",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "php",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "powershell",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "csharp",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "omnisharp",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "fsharp",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "java",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "kotlin",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "lean",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "swift",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "dart",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "lua",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "cpp",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "zig",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "haskell",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "elixir",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "expert",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "gleam",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "tinymist",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "marksman",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "ocaml",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "clojure",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "cue",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "terraform",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "nix",
+      "roots": [
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "bash",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "shuck",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "fish",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "cmake",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "docker",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "docker-official",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "yaml",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "json",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "html",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "toml",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "prisma",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "vue",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "svelte",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "css",
+      "roots": [
+        "src",
+        "lib/nested",
+        "scripts"
+      ]
+    },
+    {
+      "id": "opengrep",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "ast-grep",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "zizmor",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    },
+    {
+      "id": "typos",
+      "roots": [
+        ".",
+        ".",
+        "."
+      ]
+    }
+  ],
+  "latency": [
+    {
+      "depth": 3,
+      "calls": 20,
+      "medianMs": 0.5066459999999893,
+      "maxMs": 0.6032910000000129,
+      "samplesMs": [
+        0.40766700000000355,
+        0.40845899999999347,
+        0.41220799999996416,
+        0.45237500000001774,
+        0.45591699999999946,
+        0.46375000000000455,
+        0.4671660000000202,
+        0.4672499999999786,
+        0.48970800000000736,
+        0.495666999999969,
+        0.5176250000000095,
+        0.52049999999997,
+        0.5243750000000205,
+        0.5344589999999698,
+        0.5356249999999818,
+        0.5623340000000212,
+        0.5631249999999568,
+        0.5734590000000139,
+        0.5978749999999877,
+        0.6032910000000129
+      ]
+    },
+    {
+      "depth": 30,
+      "calls": 20,
+      "medianMs": 1.9030830000000094,
+      "maxMs": 2.3052079999999933,
+      "samplesMs": [
+        1.668957999999975,
+        1.688916000000006,
+        1.6927919999999972,
+        1.7454589999999826,
+        1.7506249999999568,
+        1.7514170000000036,
+        1.7752080000000205,
+        1.8234170000000063,
+        1.828708000000006,
+        1.9029580000000124,
+        1.9032080000000065,
+        1.9042910000000006,
+        1.9052500000000236,
+        1.9277079999999955,
+        1.9770409999999856,
+        1.982958999999994,
+        2.006458000000009,
+        2.023124999999993,
+        2.1076249999999845,
+        2.3052079999999933
+      ]
+    }
+  ]
+}

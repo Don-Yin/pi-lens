@@ -1,0 +1,626 @@
+{
+  "repository": "https://github.com/apmantza/pi-lens",
+  "baseSha": "e804c35fc011cee50b54a9859acc91e076df576a",
+  "source": "scripts/smoke-tools.mjs:classify",
+  "method": "Call the exported smoke classifier with nine failed runner kinds, with and without a synthetic diagnostic.",
+  "variants": [
+    {
+      "name": "Base",
+      "rows": [
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "timeout",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "timeout: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "timeout",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "timeout: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "exception",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "exception: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "exception",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "exception: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "server_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "server_error: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "server_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "server_error: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "parser_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (parser_error)",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "parser_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (parser_error)",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "unconfirmed_output",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (unconfirmed_output)",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "unconfirmed_output",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (unconfirmed_output)",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "output_limit",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (output_limit)",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "output_limit",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (output_limit)",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "tool_not_found",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (tool_not_found)",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "tool_not_found",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (tool_not_found)",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "future_fault_kind",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (future_fault_kind)",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "future_fault_kind",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed (future_fault_kind)",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "pass",
+            "detail": "failed",
+            "diags": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fixed",
+      "rows": [
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "timeout",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "timeout: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "timeout",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "timeout: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "exception",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "exception: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "exception",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "exception: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "server_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "server_error: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "server_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "server_error: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "parser_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "parser_error: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "parser_error",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "parser_error: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "unconfirmed_output",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "unconfirmed_output: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "unconfirmed_output",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "unconfirmed_output: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "output_limit",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "output_limit: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "output_limit",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "output_limit: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "tool_not_found",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "tool_not_found: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "tool_not_found",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "tool_not_found: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "future_fault_kind",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "future_fault_kind: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureKind": "future_fault_kind",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "future_fault_kind: could not evaluate output",
+            "diags": 1
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": []
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "unknown: could not evaluate output",
+            "diags": 0
+          }
+        },
+        {
+          "input": {
+            "result": {
+              "status": "failed",
+              "failureMessage": "could not evaluate output",
+              "diagnostics": [
+                {
+                  "message": "synthetic runner fault"
+                }
+              ]
+            }
+          },
+          "verdict": {
+            "state": "fail",
+            "detail": "unknown: could not evaluate output",
+            "diags": 1
+          }
+        }
+      ]
+    }
+  ]
+}
